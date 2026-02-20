@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐭 Pixel Studio</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a0a2e;color:#e0d0f0;font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:12px;user-select:none}
+h1{font-size:1.4em;margin:8px 0;background:linear-gradient(90deg,#ff6eb4,#c084fc,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;justify-content:center;max-width:540px}
+.toolbar button{background:#2d1b4e;border:2px solid #5b3a8a;color:#e0d0f0;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:.85em;transition:all .15s}
+.toolbar button:hover,.toolbar button.active{background:#5b3a8a;border-color:#c084fc;transform:scale(1.05)}
+.palette{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0;justify-content:center;max-width:540px}
+.swatch{width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:all .15s}
+.swatch:hover{transform:scale(1.15)}
+.swatch.active{border-color:#fff;box-shadow:0 0 8px rgba(255,255,255,.5)}
+.canvas-wrap{position:relative;border:3px solid #5b3a8a;border-radius:8px;overflow:hidden;margin:8px 0;touch-action:none;image-rendering:pixelated}
+canvas{display:block;image-rendering:pixelated;cursor:crosshair}
+.size-row{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:.85em}
+.size-row input{width:100px;accent-color:#c084fc}
+.actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0}
+.actions button{background:#2d1b4e;border:2px solid #5b3a8a;color:#e0d0f0;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:.85em;transition:all .15s}
+.actions button:hover{background:#5b3a8a;border-color:#c084fc}
+.grid-label{font-size:.75em;color:#8866aa;margin-top:2px}
+</style>
+</head>
+<body>
+<h1>🐭 Pixel Studio</h1>
+
+<div class="toolbar" id="tools"></div>
+<div class="palette" id="palette"></div>
+<div class="size-row">
+  <span>Brush:</span>
+  <input type="range" id="brushSize" min="1" max="5" value="1">
+  <span id="brushLabel">1px</span>
+</div>
+<div class="canvas-wrap" id="wrap">
+  <canvas id="grid"></canvas>
+  <canvas id="main"></canvas>
+</div>
+<div class="size-row">
+  <span>Grid:</span>
+  <select id="gridSize" style="background:#2d1b4e;color:#e0d0f0;border:1px solid #5b3a8a;border-radius:4px;padding:2px 6px">
+    <option value="16">16×16</option>
+    <option value="24">24×24</option>
+    <option value="32" selected>32×32</option>
+    <option value="48">48×48</option>
+    <option value="64">64×64</option>
+  </select>
+  <label style="font-size:.8em"><input type="checkbox" id="showGrid" checked style="accent-color:#c084fc"> Grid</label>
+</div>
+<div class="actions" id="actions"></div>
+<p class="grid-label">Right-click / long-press to pick color • Shift+click for line</p>
+
+<script>
+const COLORS = [
+  '#000000','#ffffff','#ff6eb4','#c084fc','#a855f7','#7c3aed','#4f46e5',
+  '#60a5fa','#22d3ee','#34d399','#a3e635','#facc15','#fb923c','#ef4444',
+  '#f472b6','#e879a0','#9ca3af','#6b7280','#44403c','#78716c',
+  '#fce7f3','#fdf2f8','#ede9fe','#e0e7ff','#d1fae5','#fef9c3',
+  '#fed7aa','#fecaca','#2d1b4e','#1a0a2e','#5b3a8a','transparent'
+];
+
+const TOOLS = [
+  {id:'pen',icon:'✏️',label:'Pen'},
+  {id:'eraser',icon:'🧹',label:'Eraser'},
+  {id:'fill',icon:'🪣',label:'Fill'},
+  {id:'line',icon:'📏',label:'Line'},
+  {id:'rect',icon:'⬜',label:'Rect'},
+  {id:'circle',icon:'⭕',label:'Circle'},
+  {id:'picker',icon:'💧',label:'Pick'},
+  {id:'mirror',icon:'🪞',label:'Mirror'},
+];
+
+const ACTIONS = [
+  {id:'undo',icon:'↩️',label:'Undo'},
+  {id:'redo',icon:'↪️',label:'Redo'},
+  {id:'clear',icon:'🗑️',label:'Clear'},
+  {id:'download',icon:'💾',label:'Save PNG'},
+];
+
+let gridN = 32, pxSize = 14;
+let tool = 'pen', color = '#ff6eb4', mirror = false;
+let pixels, history = [], redoStack = [], drawing = false;
+let lineStart = null, shiftHeld = false;
+
+const mainC = document.getElementById('main');
+const gridC = document.getElementById('grid');
+const ctx = mainC.getContext('2d');
+const gctx = gridC.getContext('2d');
+const wrap = document.getElementById('wrap');
+
+function init() {
+  pxSize = Math.min(14, Math.floor((Math.min(window.innerWidth - 40, 540)) / gridN));
+  const sz = gridN * pxSize;
+  mainC.width = gridC.width = sz;
+  mainC.height = gridC.height = sz;
+  mainC.style.position = 'absolute'; mainC.style.top = '0'; mainC.style.left = '0';
+  gridC.style.position = 'relative';
+  wrap.style.width = sz + 'px'; wrap.style.height = sz + 'px';
+  pixels = Array.from({length: gridN}, () => Array(gridN).fill(null));
+  history = []; redoStack = [];
+  drawGrid(); render();
+}
+
+function drawGrid() {
+  const sz = gridN * pxSize;
+  gctx.clearRect(0, 0, sz, sz);
+  if (!document.getElementById('showGrid').checked) return;
+  gctx.strokeStyle = 'rgba(91,58,138,0.3)';
+  gctx.lineWidth = 0.5;
+  for (let i = 0; i <= gridN; i++) {
+    gctx.beginPath(); gctx.moveTo(i*pxSize, 0); gctx.lineTo(i*pxSize, sz); gctx.stroke();
+    gctx.beginPath(); gctx.moveTo(0, i*pxSize); gctx.lineTo(sz, i*pxSize); gctx.stroke();
+  }
+}
+
+function render() {
+  const sz = gridN * pxSize;
+  ctx.clearRect(0, 0, sz, sz);
+  for (let y = 0; y < gridN; y++) for (let x = 0; x < gridN; x++) {
+    if (pixels[y][x]) {
+      ctx.fillStyle = pixels[y][x];
+      ctx.fillRect(x*pxSize, y*pxSize, pxSize, pxSize);
+    }
+  }
+}
+
+function saveState() {
+  history.push(pixels.map(r => [...r]));
+  if (history.length > 50) history.shift();
+  redoStack = [];
+}
+
+function undo() {
+  if (!history.length) return;
+  redoStack.push(pixels.map(r => [...r]));
+  pixels = history.pop();
+  render();
+}
+
+function redo() {
+  if (!redoStack.length) return;
+  history.push(pixels.map(r => [...r]));
+  pixels = redoStack.pop();
+  render();
+}
+
+function setPixel(x, y, c) {
+  if (x < 0 || x >= gridN || y < 0 || y >= gridN) return;
+  pixels[y][x] = c;
+}
+
+function brushAt(x, y, c) {
+  const bs = parseInt(document.getElementById('brushSize').value);
+  const r = Math.floor(bs / 2);
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    setPixel(x+dx, y+dy, c);
+    if (mirror) setPixel(gridN-1-x-dx, y+dy, c);
+  }
+}
+
+function plotLine(x0,y0,x1,y1,c) {
+  const dx=Math.abs(x1-x0), dy=Math.abs(y1-y0);
+  const sx=x0<x1?1:-1, sy=y0<y1?1:-1;
+  let err=dx-dy;
+  while(true) {
+    brushAt(x0,y0,c);
+    if(x0===x1&&y0===y1) break;
+    const e2=2*err;
+    if(e2>-dy){err-=dy;x0+=sx}
+    if(e2<dx){err+=dx;y0+=sy}
+  }
+}
+
+function plotRect(x0,y0,x1,y1,c) {
+  const lx=Math.min(x0,x1),hx=Math.max(x0,x1),ly=Math.min(y0,y1),hy=Math.max(y0,y1);
+  for(let x=lx;x<=hx;x++){brushAt(x,ly,c);brushAt(x,hy,c)}
+  for(let y=ly;y<=hy;y++){brushAt(lx,y,c);brushAt(hx,y,c)}
+}
+
+function plotCircle(cx,cy,r,c) {
+  let x=r,y=0,err=1-r;
+  while(x>=y) {
+    [[ cx+x,cy+y],[cx-x,cy+y],[cx+x,cy-y],[cx-x,cy-y],
+     [cx+y,cy+x],[cx-y,cy+x],[cx+y,cy-x],[cx-y,cy-x]].forEach(([px,py])=>brushAt(px,py,c));
+    y++;
+    if(err<0) err+=2*y+1;
+    else {x--;err+=2*(y-x)+1}
+  }
+}
+
+function floodFill(sx,sy,nc) {
+  const oc = pixels[sy]?.[sx];
+  if (oc === nc) return;
+  const stack = [[sx,sy]];
+  while(stack.length) {
+    const [x,y] = stack.pop();
+    if (x<0||x>=gridN||y<0||y>=gridN) continue;
+    if (pixels[y][x] !== oc) continue;
+    pixels[y][x] = nc;
+    stack.push([x-1,y],[x+1,y],[x,y-1],[x,y+1]);
+  }
+}
+
+function getXY(e) {
+  const rect = mainC.getBoundingClientRect();
+  const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+  return [Math.floor(cx/pxSize), Math.floor(cy/pxSize)];
+}
+
+function applyTool(x, y, isStart) {
+  const c = tool === 'eraser' ? null : color;
+  if (tool === 'pen' || tool === 'eraser') { brushAt(x, y, c); render(); }
+  else if (tool === 'fill' && isStart) { floodFill(x, y, c); render(); }
+  else if (tool === 'picker' && isStart) {
+    const pc = pixels[y]?.[x];
+    if (pc) { color = pc; buildPalette(); }
+  }
+}
+
+let shapeStart = null, previewState = null;
+
+mainC.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (e.button === 2) { // right click = pick
+    const [x,y] = getXY(e);
+    const pc = pixels[y]?.[x];
+    if (pc) { color = pc; buildPalette(); }
+    return;
+  }
+  drawing = true;
+  const [x,y] = getXY(e);
+  saveState();
+  if (['line','rect','circle'].includes(tool)) {
+    shapeStart = [x,y];
+    previewState = pixels.map(r=>[...r]);
+  } else {
+    applyTool(x, y, true);
+  }
+  mainC.setPointerCapture(e.pointerId);
+});
+
+mainC.addEventListener('pointermove', e => {
+  if (!drawing) return;
+  const [x,y] = getXY(e);
+  if (shapeStart) {
+    pixels = previewState.map(r=>[...r]);
+    const c = tool === 'eraser' ? null : color;
+    const [sx,sy] = shapeStart;
+    if (tool==='line') plotLine(sx,sy,x,y,c);
+    else if (tool==='rect') plotRect(sx,sy,x,y,c);
+    else if (tool==='circle') { const r=Math.round(Math.hypot(x-sx,y-sy)); plotCircle(sx,sy,r,c); }
+    render();
+  } else {
+    applyTool(x, y, false);
+  }
+});
+
+mainC.addEventListener('pointerup', e => {
+  if (shapeStart) {
+    const [x,y] = getXY(e);
+    pixels = previewState.map(r=>[...r]);
+    const c = tool === 'eraser' ? null : color;
+    const [sx,sy] = shapeStart;
+    if (tool==='line') plotLine(sx,sy,x,y,c);
+    else if (tool==='rect') plotRect(sx,sy,x,y,c);
+    else if (tool==='circle') { const r=Math.round(Math.hypot(x-sx,y-sy)); plotCircle(sx,sy,r,c); }
+    render();
+    shapeStart = null; previewState = null;
+  }
+  drawing = false;
+});
+
+mainC.addEventListener('contextmenu', e => e.preventDefault());
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'z' && (e.ctrlKey||e.metaKey)) { e.shiftKey ? redo() : undo(); e.preventDefault(); }
+});
+
+// Build UI
+function buildTools() {
+  const el = document.getElementById('tools');
+  el.innerHTML = TOOLS.map(t =>
+    `<button data-tool="${t.id}" class="${t.id===tool||(t.id==='mirror'&&mirror)?'active':''}">${t.icon} ${t.label}</button>`
+  ).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const t = b.dataset.tool;
+    if (t === 'mirror') { mirror = !mirror; }
+    else { tool = t; }
+    buildTools();
+  });
+}
+
+function buildPalette() {
+  const el = document.getElementById('palette');
+  el.innerHTML = COLORS.map(c => {
+    const bg = c === 'transparent'
+      ? 'background:repeating-conic-gradient(#666 0% 25%, #999 0% 50%) 50%/8px 8px'
+      : `background:${c}`;
+    return `<div class="swatch ${c===color?'active':''}" style="${bg}" data-color="${c}"></div>`;
+  }).join('');
+  el.querySelectorAll('.swatch').forEach(s => s.onclick = () => {
+    color = s.dataset.color === 'transparent' ? null : s.dataset.color;
+    buildPalette();
+  });
+}
+
+function buildActions() {
+  const el = document.getElementById('actions');
+  el.innerHTML = ACTIONS.map(a => `<button data-action="${a.id}">${a.icon} ${a.label}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const a = b.dataset.action;
+    if (a === 'undo') undo();
+    else if (a === 'redo') redo();
+    else if (a === 'clear') { saveState(); pixels = Array.from({length:gridN},()=>Array(gridN).fill(null)); render(); }
+    else if (a === 'download') {
+      const tmp = document.createElement('canvas');
+      tmp.width = tmp.height = gridN;
+      const tc = tmp.getContext('2d');
+      for (let y=0;y<gridN;y++) for(let x=0;x<gridN;x++) {
+        if(pixels[y][x]){tc.fillStyle=pixels[y][x];tc.fillRect(x,1,1,1);}
+      }
+      // Fix: draw properly
+      tc.clearRect(0,0,gridN,gridN);
+      for (let y=0;y<gridN;y++) for(let x=0;x<gridN;x++) {
+        if(pixels[y][x]){tc.fillStyle=pixels[y][x];tc.fillRect(x,y,1,1);}
+      }
+      const link = document.createElement('a');
+      link.download = 'pixel-art.png';
+      link.href = tmp.toDataURL();
+      link.click();
+    }
+  });
+}
+
+document.getElementById('brushSize').oninput = e => {
+  document.getElementById('brushLabel').textContent = e.target.value + 'px';
+};
+
+document.getElementById('gridSize').onchange = e => {
+  gridN = parseInt(e.target.value);
+  init();
+};
+
+document.getElementById('showGrid').onchange = drawGrid;
+
+buildTools(); buildPalette(); buildActions(); init();
+</script>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🐭 Mouse Chase!</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a0a2e; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; color: #e8d5f5; }
+#game-container { position: relative; touch-action: none; }
+canvas { border-radius: 12px; border: 2px solid #6b3fa0; display: block; }
+#ui { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 10px 14px; font-size: 16px; font-weight: 600; pointer-events: none; z-index: 2; }
+#ui span { background: rgba(26, 10, 46, 0.7); padding: 4px 10px; border-radius: 8px; }
+#overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(26, 10, 46, 0.85); border-radius: 12px; z-index: 3; text-align: center; }
+#overlay h1 { font-size: 28px; margin-bottom: 6px; }
+#overlay p { font-size: 14px; opacity: 0.8; margin-bottom: 16px; max-width: 260px; line-height: 1.4; }
+#overlay .score-display { font-size: 22px; margin-bottom: 12px; }
+#overlay button { background: linear-gradient(135deg, #9b59b6, #6b3fa0); color: white; border: none; padding: 12px 32px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.1s; }
+#overlay button:hover { transform: scale(1.05); }
+#overlay button:active { transform: scale(0.95); }
+.hidden { display: none !important; }
+#controls { margin-top: 12px; font-size: 12px; opacity: 0.5; }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <canvas id="c"></canvas>
+  <div id="ui">
+    <span id="score-el">🧀 0</span>
+    <span id="lives-el">💜💜💜</span>
+  </div>
+  <div id="overlay">
+    <h1>🐭 Mouse Chase!</h1>
+    <p>Collect cheese. Avoid cats. Survive as long as you can!</p>
+    <p style="font-size:12px; opacity:0.6;">Arrow keys / WASD / swipe to move</p>
+    <button id="start-btn">Play!</button>
+  </div>
+</div>
+<div id="controls">arrow keys · wasd · swipe</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const scoreEl = document.getElementById('score-el');
+const livesEl = document.getElementById('lives-el');
+const startBtn = document.getElementById('start-btn');
+
+// Size
+const W = Math.min(380, window.innerWidth - 20);
+const H = Math.min(560, window.innerHeight - 80);
+canvas.width = W; canvas.height = H;
+
+// Game state
+let mouse, cheeses, cats, particles, score, lives, gameOver, speed, spawnTimer, invulnTimer, frame;
+
+const MOUSE_R = 14;
+const CHEESE_R = 10;
+const CAT_R = 16;
+
+function init() {
+  mouse = { x: W/2, y: H - 60, vx: 0, vy: 0 };
+  cheeses = []; cats = []; particles = [];
+  score = 0; lives = 3; gameOver = false; speed = 1; spawnTimer = 0; invulnTimer = 0; frame = 0;
+  for (let i = 0; i < 3; i++) spawnCheese();
+  updateUI();
+}
+
+function spawnCheese() {
+  cheeses.push({ x: 20 + Math.random() * (W-40), y: 20 + Math.random() * (H-80), bob: Math.random() * Math.PI * 2 });
+}
+
+function spawnCat() {
+  const side = Math.random();
+  let x, y, vx, vy;
+  const s = (1.2 + Math.random() * 1.5) * speed;
+  if (side < 0.25) { x = -CAT_R; y = Math.random() * H; vx = s; vy = (Math.random()-0.5)*s; }
+  else if (side < 0.5) { x = W+CAT_R; y = Math.random() * H; vx = -s; vy = (Math.random()-0.5)*s; }
+  else if (side < 0.75) { x = Math.random() * W; y = -CAT_R; vx = (Math.random()-0.5)*s; vy = s; }
+  else { x = Math.random() * W; y = H+CAT_R; vx = (Math.random()-0.5)*s; vy = -s; }
+  cats.push({ x, y, vx, vy, age: 0 });
+}
+
+function burst(x, y, color, n=8) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = 1 + Math.random() * 3;
+    particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, color });
+  }
+}
+
+function updateUI() {
+  scoreEl.textContent = '🧀 ' + score;
+  livesEl.textContent = Array(Math.max(0,lives)).fill('💜').join('');
+}
+
+// Input
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.key] = true; if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); });
+window.addEventListener('keyup', e => keys[e.key] = false);
+
+let touchStart = null;
+canvas.addEventListener('touchstart', e => { e.preventDefault(); const t = e.touches[0]; touchStart = { x: t.clientX, y: t.clientY }; }, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!touchStart) return;
+  const t = e.touches[0];
+  const dx = t.clientX - touchStart.x;
+  const dy = t.clientY - touchStart.y;
+  mouse.vx = dx * 0.15;
+  mouse.vy = dy * 0.15;
+}, { passive: false });
+canvas.addEventListener('touchend', () => { touchStart = null; mouse.vx *= 0.3; mouse.vy *= 0.3; });
+
+function handleInput() {
+  const accel = 0.8;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) mouse.vx -= accel;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) mouse.vx += accel;
+  if (keys['ArrowUp'] || keys['w'] || keys['W']) mouse.vy -= accel;
+  if (keys['ArrowDown'] || keys['s'] || keys['S']) mouse.vy += accel;
+}
+
+function drawMouse(x, y) {
+  const blink = invulnTimer > 0 && Math.floor(frame/4) % 2;
+  if (blink) { ctx.globalAlpha = 0.3; }
+  // Body
+  ctx.fillStyle = '#b0b0b0';
+  ctx.beginPath(); ctx.ellipse(x, y, MOUSE_R, MOUSE_R*1.1, 0, 0, Math.PI*2); ctx.fill();
+  // Ears
+  ctx.fillStyle = '#d4a0d4';
+  ctx.beginPath(); ctx.ellipse(x-9, y-11, 7, 8, -0.3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x+9, y-11, 7, 8, 0.3, 0, Math.PI*2); ctx.fill();
+  // Eyes
+  ctx.fillStyle = '#1a0a2e';
+  ctx.beginPath(); ctx.arc(x-4, y-3, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+4, y-3, 2.5, 0, Math.PI*2); ctx.fill();
+  // Nose
+  ctx.fillStyle = '#ff99cc';
+  ctx.beginPath(); ctx.arc(x, y+3, 2, 0, Math.PI*2); ctx.fill();
+  // Tail
+  ctx.strokeStyle = '#d4a0d4'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y+MOUSE_R);
+  ctx.quadraticCurveTo(x + Math.sin(frame*0.1)*8, y+MOUSE_R+12, x + Math.sin(frame*0.08)*12, y+MOUSE_R+20);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawCheese(c) {
+  const by = Math.sin(c.bob + frame*0.05) * 3;
+  const x = c.x, y = c.y + by;
+  ctx.fillStyle = '#ffd700';
+  ctx.beginPath();
+  ctx.moveTo(x, y-CHEESE_R);
+  ctx.lineTo(x+CHEESE_R, y+CHEESE_R*0.6);
+  ctx.lineTo(x-CHEESE_R, y+CHEESE_R*0.6);
+  ctx.closePath(); ctx.fill();
+  // Holes
+  ctx.fillStyle = '#e6b800';
+  ctx.beginPath(); ctx.arc(x-2, y, 2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+3, y-3, 1.5, 0, Math.PI*2); ctx.fill();
+}
+
+function drawCat(c) {
+  const x = c.x, y = c.y;
+  // Body
+  ctx.fillStyle = '#e07040';
+  ctx.beginPath(); ctx.ellipse(x, y, CAT_R, CAT_R*1.1, 0, 0, Math.PI*2); ctx.fill();
+  // Ears
+  ctx.fillStyle = '#c05030';
+  ctx.beginPath(); ctx.moveTo(x-10, y-12); ctx.lineTo(x-6, y-20); ctx.lineTo(x-2, y-12); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x+2, y-12); ctx.lineTo(x+6, y-20); ctx.lineTo(x+10, y-12); ctx.fill();
+  // Eyes
+  ctx.fillStyle = '#ffe066';
+  ctx.beginPath(); ctx.ellipse(x-5, y-3, 3, 4, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x+5, y-3, 3, 4, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#1a0a2e';
+  ctx.beginPath(); ctx.ellipse(x-5, y-3, 1.2, 3.5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x+5, y-3, 1.2, 3.5, 0, 0, Math.PI*2); ctx.fill();
+  // Mouth
+  ctx.strokeStyle = '#1a0a2e'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(x-2, y+5, 3, 0, Math.PI); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x+2, y+5, 3, 0, Math.PI); ctx.stroke();
+}
+
+function dist(a, b) { return Math.hypot(a.x-b.x, a.y-b.y); }
+
+function update() {
+  frame++;
+  handleInput();
+
+  // Mouse physics
+  mouse.vx *= 0.88; mouse.vy *= 0.88;
+  mouse.x += mouse.vx; mouse.y += mouse.vy;
+  mouse.x = Math.max(MOUSE_R, Math.min(W-MOUSE_R, mouse.x));
+  mouse.y = Math.max(MOUSE_R, Math.min(H-MOUSE_R, mouse.y));
+
+  if (invulnTimer > 0) invulnTimer--;
+
+  // Cheese collection
+  for (let i = cheeses.length-1; i >= 0; i--) {
+    if (dist(mouse, cheeses[i]) < MOUSE_R + CHEESE_R) {
+      burst(cheeses[i].x, cheeses[i].y, '#ffd700', 12);
+      cheeses.splice(i, 1);
+      score++;
+      speed = 1 + score * 0.05;
+      spawnCheese();
+      updateUI();
+    }
+  }
+
+  // Cat movement + seeking
+  cats.forEach(c => {
+    c.age++;
+    // Slight homing after a bit
+    if (c.age > 60) {
+      const dx = mouse.x - c.x, dy = mouse.y - c.y;
+      const d = Math.hypot(dx, dy) || 1;
+      c.vx += (dx/d) * 0.03 * speed;
+      c.vy += (dy/d) * 0.03 * speed;
+    }
+    c.x += c.vx; c.y += c.vy;
+  });
+
+  // Cat collision
+  if (invulnTimer <= 0) {
+    for (let i = cats.length-1; i >= 0; i--) {
+      if (dist(mouse, cats[i]) < MOUSE_R + CAT_R - 4) {
+        burst(mouse.x, mouse.y, '#ff6699', 16);
+        lives--;
+        invulnTimer = 90;
+        cats.splice(i, 1);
+        updateUI();
+        if (lives <= 0) { endGame(); return; }
+        break;
+      }
+    }
+  }
+
+  // Remove offscreen cats
+  cats = cats.filter(c => c.x > -50 && c.x < W+50 && c.y > -50 && c.y < H+50);
+
+  // Spawn cats
+  spawnTimer++;
+  const interval = Math.max(30, 90 - score * 2);
+  if (spawnTimer >= interval) { spawnTimer = 0; spawnCat(); }
+
+  // Particles
+  particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.life -= 0.03; p.vy += 0.05; });
+  particles = particles.filter(p => p.life > 0);
+}
+
+function draw() {
+  // Background
+  ctx.fillStyle = '#1a0a2e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Floor grid
+  ctx.strokeStyle = 'rgba(107,63,160,0.15)'; ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  cheeses.forEach(c => drawCheese(c));
+  cats.forEach(c => drawCat(c));
+  drawMouse(mouse.x, mouse.y);
+
+  // Particles
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function endGame() {
+  gameOver = true;
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = `
+    <h1>${score >= 20 ? '🏆' : score >= 10 ? '⭐' : '🐱'} Game Over!</h1>
+    <div class="score-display">🧀 ${score} cheese collected</div>
+    <p>${score >= 20 ? 'Legendary mouse!' : score >= 10 ? 'Nimble little thing!' : score >= 5 ? 'Not bad for a small mouse!' : 'The cats got you... try again?'}</p>
+    <button id="restart-btn">Play Again</button>
+  `;
+  document.getElementById('restart-btn').addEventListener('click', startGame);
+}
+
+function loop() {
+  if (!gameOver) {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+}
+
+function startGame() {
+  init();
+  overlay.classList.add('hidden');
+  requestAnimationFrame(loop);
+}
+
+startBtn.addEventListener('click', startGame);
+</script>
+</body>
+</html>

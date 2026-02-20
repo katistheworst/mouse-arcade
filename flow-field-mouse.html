@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow Field Mouse 🐭</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a12;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+  }
+  canvas { border-radius: 12px; cursor: crosshair; }
+  .controls {
+    position: fixed;
+    bottom: 20px;
+    display: flex;
+    gap: 12px;
+    z-index: 10;
+  }
+  button {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #c8b8e8;
+    padding: 8px 18px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+  button:hover { background: rgba(200,184,232,0.2); }
+  .title {
+    position: fixed;
+    top: 20px;
+    color: rgba(200,184,232,0.4);
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="title">M.O.U.S.E. — flow field self-portrait</div>
+<canvas id="c"></canvas>
+<div class="controls">
+  <button onclick="reset()">regenerate</button>
+  <button onclick="togglePause()">pause</button>
+  <button onclick="cycleColor()">palette</button>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = canvas.width = Math.min(window.innerWidth - 40, 700);
+const H = canvas.height = Math.min(window.innerHeight - 100, 700);
+
+// Mouse silhouette as a signed distance function approximation
+// We'll use a bitmap mask approach - draw a mouse shape, sample it
+const mask = document.createElement('canvas');
+mask.width = W; mask.height = H;
+const mctx = mask.getContext('2d');
+
+function drawMouseShape() {
+  mctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+  const s = Math.min(W, H) * 0.38;
+
+  mctx.fillStyle = '#fff';
+  mctx.beginPath();
+
+  // Body - plump oval
+  mctx.ellipse(cx, cy + s * 0.15, s * 0.55, s * 0.65, 0, 0, Math.PI * 2);
+  mctx.fill();
+
+  // Head
+  mctx.beginPath();
+  mctx.ellipse(cx, cy - s * 0.45, s * 0.38, s * 0.35, 0, 0, Math.PI * 2);
+  mctx.fill();
+
+  // Left ear
+  mctx.beginPath();
+  mctx.ellipse(cx - s * 0.32, cy - s * 0.78, s * 0.22, s * 0.25, -0.3, 0, Math.PI * 2);
+  mctx.fill();
+
+  // Right ear
+  mctx.beginPath();
+  mctx.ellipse(cx + s * 0.32, cy - s * 0.78, s * 0.22, s * 0.25, 0.3, 0, Math.PI * 2);
+  mctx.fill();
+
+  // Eyes (cut out)
+  mctx.fillStyle = '#000';
+  mctx.beginPath();
+  mctx.ellipse(cx - s * 0.14, cy - s * 0.48, s * 0.06, s * 0.07, 0, 0, Math.PI * 2);
+  mctx.fill();
+  mctx.beginPath();
+  mctx.ellipse(cx + s * 0.14, cy - s * 0.48, s * 0.06, s * 0.07, 0, 0, Math.PI * 2);
+  mctx.fill();
+
+  // Nose
+  mctx.fillStyle = '#fff';
+  mctx.beginPath();
+  mctx.ellipse(cx, cy - s * 0.32, s * 0.045, s * 0.04, 0, 0, Math.PI * 2);
+  mctx.fill();
+
+  // Tail - thick curved line
+  mctx.strokeStyle = '#fff';
+  mctx.lineWidth = s * 0.06;
+  mctx.lineCap = 'round';
+  mctx.beginPath();
+  mctx.moveTo(cx + s * 0.1, cy + s * 0.75);
+  mctx.bezierCurveTo(cx + s * 0.6, cy + s * 0.9, cx + s * 0.7, cy + s * 0.3, cx + s * 0.5, cy + s * 0.1);
+  mctx.stroke();
+}
+
+drawMouseShape();
+const maskData = mctx.getImageData(0, 0, W, H).data;
+function isInMouse(x, y) {
+  const i = (Math.floor(y) * W + Math.floor(x)) * 4;
+  return maskData[i] > 128;
+}
+
+// Flow field
+const SCALE = 18;
+const cols = Math.ceil(W / SCALE);
+const rows = Math.ceil(H / SCALE);
+let field = [];
+let seed = Math.random() * 1000;
+let paused = false;
+let colorIdx = 0;
+
+const palettes = [
+  // Princess Bubblegum
+  ['#ff6b9d', '#c44dff', '#ff9de2', '#9d4dff', '#ffb3d9'],
+  // Ocean
+  ['#00b4d8', '#0077b6', '#90e0ef', '#48cae4', '#caf0f8'],
+  // Sunset
+  ['#ff6b35', '#f7c59f', '#efefd0', '#004e89', '#1a659e'],
+  // Neon
+  ['#ff00ff', '#00ffff', '#ff0080', '#80ff00', '#ffff00'],
+  // Ghost
+  ['#e8e8e8', '#c0c0c0', '#a0a0a0', '#808080', '#d0d0d0'],
+];
+
+function noise(x, y) {
+  // Simple value noise
+  const s = seed;
+  const n = Math.sin(x * 12.9898 + y * 78.233 + s) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function smoothNoise(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = x - ix, fy = y - iy;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+  const n00 = noise(ix, iy);
+  const n10 = noise(ix + 1, iy);
+  const n01 = noise(ix, iy + 1);
+  const n11 = noise(ix + 1, iy + 1);
+  return (n00 * (1 - sx) + n10 * sx) * (1 - sy) + (n01 * (1 - sx) + n11 * sx) * sy;
+}
+
+function generateField() {
+  field = [];
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const n = smoothNoise(x * 0.15, y * 0.15);
+      field[y * cols + x] = n * Math.PI * 4;
+    }
+  }
+}
+
+// Particles
+let particles = [];
+const NUM_PARTICLES = 3000;
+
+function createParticle() {
+  // Bias spawn inside mouse shape
+  let x, y, attempts = 0;
+  do {
+    x = Math.random() * W;
+    y = Math.random() * H;
+    attempts++;
+  } while (!isInMouse(x, y) && attempts < 50);
+
+  const pal = palettes[colorIdx];
+  return {
+    x, y,
+    px: x, py: y,
+    speed: 0.5 + Math.random() * 1.5,
+    life: 200 + Math.random() * 300,
+    maxLife: 200 + Math.random() * 300,
+    color: pal[Math.floor(Math.random() * pal.length)],
+    inside: isInMouse(x, y),
+  };
+}
+
+function initParticles() {
+  particles = [];
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+    particles.push(createParticle());
+  }
+}
+
+let time = 0;
+
+function animate() {
+  if (paused) { requestAnimationFrame(animate); return; }
+
+  // Fade trail
+  ctx.fillStyle = 'rgba(10, 10, 18, 0.04)';
+  ctx.fillRect(0, 0, W, H);
+
+  time += 0.003;
+
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    p.px = p.x;
+    p.py = p.y;
+
+    const col = Math.floor(p.x / SCALE);
+    const row = Math.floor(p.y / SCALE);
+
+    if (col >= 0 && col < cols && row >= 0 && row < rows) {
+      const angle = field[row * cols + col] + time * 2;
+      const inMouse = isInMouse(p.x, p.y);
+
+      // Inside mouse: follow flow field tightly
+      // Outside: scatter away
+      if (inMouse) {
+        p.x += Math.cos(angle) * p.speed;
+        p.y += Math.sin(angle) * p.speed;
+      } else {
+        // Push outward from center, fast fade
+        const dx = p.x - W / 2;
+        const dy = p.y - H / 2;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        p.x += (dx / dist) * p.speed * 0.5 + Math.cos(angle) * p.speed * 0.3;
+        p.y += (dy / dist) * p.speed * 0.5 + Math.sin(angle) * p.speed * 0.3;
+        p.life -= 3;
+      }
+    }
+
+    p.life--;
+
+    if (p.life <= 0 || p.x < 0 || p.x > W || p.y < 0 || p.y > H) {
+      particles[i] = createParticle();
+      continue;
+    }
+
+    const alpha = Math.min(1, p.life / (p.maxLife * 0.2)) * 0.6;
+    ctx.strokeStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(p.px, p.py);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+
+  // Subtle eye glow
+  const pal = palettes[colorIdx];
+  const cx = W / 2, s = Math.min(W, H) * 0.38;
+  const glowAlpha = 0.15 + Math.sin(time * 8) * 0.08;
+  ctx.fillStyle = pal[0] + Math.floor(glowAlpha * 255).toString(16).padStart(2, '0');
+  ctx.beginPath();
+  ctx.ellipse(cx - s * 0.14, H / 2 - s * 0.48, s * 0.08, s * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + s * 0.14, H / 2 - s * 0.48, s * 0.08, s * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  requestAnimationFrame(animate);
+}
+
+function reset() {
+  seed = Math.random() * 1000;
+  generateField();
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, W, H);
+  initParticles();
+}
+
+function togglePause() { paused = !paused; }
+function cycleColor() {
+  colorIdx = (colorIdx + 1) % palettes.length;
+  particles.forEach(p => {
+    const pal = palettes[colorIdx];
+    p.color = pal[Math.floor(Math.random() * pal.length)];
+  });
+}
+
+// Mouse interaction — attract particles
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  for (let i = 0; i < particles.length; i += 3) {
+    const p = particles[i];
+    const dx = mx - p.x, dy = my - p.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 80) {
+      p.x += dx * 0.02;
+      p.y += dy * 0.02;
+    }
+  }
+});
+
+generateField();
+initParticles();
+animate();
+</script>
+</body>
+</html>

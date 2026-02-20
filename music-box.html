@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🎵 Mouse Music Box</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a0a2e;font-family:'Segoe UI',sans-serif;color:#e8d5f5;overflow-x:hidden;min-height:100vh;display:flex;flex-direction:column;align-items:center;user-select:none}
+h1{margin:20px 0 5px;font-size:1.6em;text-align:center;background:linear-gradient(135deg,#ff6b9d,#c084fc,#67e8f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{font-size:.8em;opacity:.6;margin-bottom:15px;text-align:center}
+.controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
+.controls button{background:rgba(192,132,252,.15);border:1px solid rgba(192,132,252,.3);color:#c084fc;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:.8em;transition:all .2s}
+.controls button:hover,.controls button.active{background:rgba(192,132,252,.35);border-color:#c084fc}
+.pad-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:360px;width:90%;margin-bottom:15px}
+.pad{aspect-ratio:1;border-radius:16px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:1.8em;transition:all .15s;border:2px solid transparent;position:relative;overflow:hidden}
+.pad span{font-size:.4em;margin-top:4px;opacity:.7}
+.pad:active,.pad.hit{transform:scale(.92);filter:brightness(1.4)}
+.pad .ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.3);animation:rip .5s ease-out forwards;pointer-events:none}
+@keyframes rip{0%{width:0;height:0;opacity:1}100%{width:200px;height:200px;opacity:0}}
+.keys{display:flex;gap:3px;max-width:420px;width:95%;margin-bottom:15px;justify-content:center}
+.key{flex:1;max-width:45px;height:120px;border-radius:0 0 8px 8px;cursor:pointer;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;font-size:.6em;transition:all .1s;position:relative}
+.key.white{background:linear-gradient(180deg,#f0e6ff,#fff);color:#555;border:1px solid #ccc;z-index:1}
+.key.black{background:linear-gradient(180deg,#2d1b4e,#1a0a2e);color:#888;border:1px solid #444;height:75px;margin:0 -12px;z-index:2;max-width:30px;border-radius:0 0 6px 6px}
+.key:active,.key.hit{filter:brightness(.8);transform:scaleY(.97)}
+.seq-bar{display:flex;gap:3px;max-width:420px;width:95%;margin-bottom:10px;justify-content:center;flex-wrap:wrap}
+.seq-step{width:22px;height:22px;border-radius:4px;background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.2);cursor:pointer;transition:all .15s}
+.seq-step.on{background:rgba(192,132,252,.5);border-color:#c084fc}
+.seq-step.current{box-shadow:0 0 8px #c084fc}
+.transport{display:flex;gap:8px;margin-bottom:15px;align-items:center}
+.transport button{background:rgba(255,107,157,.15);border:1px solid rgba(255,107,157,.3);color:#ff6b9d;padding:6px 16px;border-radius:20px;cursor:pointer;font-size:.85em}
+.transport button:hover{background:rgba(255,107,157,.35)}
+.tempo{color:#67e8f9;font-size:.8em}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<h1>🎵 Mouse Music Box</h1>
+<p class="sub">tap pads, play keys, make loops 💜</p>
+
+<div class="controls">
+<button class="active" data-sound="cute">🔔 Cute</button>
+<button data-sound="synth">✨ Synth</button>
+<button data-sound="bass">🎸 Bass</button>
+<button data-sound="perc">🥁 Perc</button>
+</div>
+
+<div class="pad-grid" id="pads"></div>
+
+<div class="keys" id="piano"></div>
+
+<p class="sub">sequencer — click steps to toggle, hit play</p>
+<div class="seq-bar" id="seq"></div>
+<div class="transport">
+<button id="playBtn">▶ Play</button>
+<button id="clearBtn">🗑 Clear</button>
+<span class="tempo" id="tempoLabel">120 BPM</span>
+<input type="range" min="60" max="200" value="120" id="tempoSlider" style="width:80px;accent-color:#c084fc">
+</div>
+
+<script>
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+const padColors=['#ff6b9d','#c084fc','#67e8f9','#f9a8d4','#a78bfa','#34d399','#fbbf24','#fb7185',
+'#818cf8','#2dd4bf','#f472b6','#a3e635','#e879f9','#38bdf8','#fb923c','#6ee7b7'];
+const padNotes=['C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5','A5','B5','C6','D6'];
+const noteFreq={C3:130.81,D3:146.83,E3:164.81,F3:174.61,G3:196,A3:220,B3:246.94,
+C4:261.63,'C#4':277.18,D4:293.66,'D#4':311.13,E4:329.63,F4:349.23,'F#4':369.99,
+G4:392,'G#4':415.3,A4:440,'A#4':466.16,B4:493.88,C5:523.25,'C#5':554.37,D5:587.33,
+'D#5':622.25,E5:659.26,F5:698.46,'F#5':739.99,G5:783.99,'G#5':830.61,A5:880,
+'A#5':932.33,B5:987.77,C6:1046.5,D6:1174.66};
+
+let soundMode='cute';
+const sounds={
+cute:(f)=>{const o=AC.createOscillator(),g=AC.createGain(),o2=AC.createOscillator();
+o.type='sine';o.frequency.value=f;o2.type='sine';o2.frequency.value=f*2;
+g.gain.setValueAtTime(.3,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.5);
+o.connect(g);o2.connect(g);g.connect(AC.destination);o.start();o2.start();o.stop(AC.currentTime+.5);o2.stop(AC.currentTime+.5)},
+synth:(f)=>{const o=AC.createOscillator(),g=AC.createGain(),fl=AC.createBiquadFilter();
+o.type='sawtooth';o.frequency.value=f;fl.type='lowpass';fl.frequency.value=f*3;fl.Q.value=5;
+g.gain.setValueAtTime(.2,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.6);
+fl.frequency.exponentialRampToValueAtTime(f*.5,AC.currentTime+.6);
+o.connect(fl);fl.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+.6)},
+bass:(f)=>{const o=AC.createOscillator(),g=AC.createGain();
+o.type='triangle';o.frequency.value=f/2;
+g.gain.setValueAtTime(.4,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.4);
+o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+.4)},
+perc:(f)=>{const o=AC.createOscillator(),g=AC.createGain(),n=AC.createOscillator();
+o.type='square';o.frequency.value=f;o.frequency.exponentialRampToValueAtTime(f*.1,AC.currentTime+.15);
+n.type='sawtooth';n.frequency.value=f*4;n.frequency.exponentialRampToValueAtTime(20,AC.currentTime+.1);
+g.gain.setValueAtTime(.25,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.15);
+o.connect(g);n.connect(g);g.connect(AC.destination);o.start();n.start();o.stop(AC.currentTime+.15);n.stop(AC.currentTime+.15)}
+};
+
+function play(note){if(AC.state==='suspended')AC.resume();const f=noteFreq[note]||440;sounds[soundMode](f)}
+
+// Pads
+const padGrid=document.getElementById('pads');
+const padEls=[];
+padNotes.forEach((n,i)=>{
+const d=document.createElement('div');d.className='pad';
+d.style.background=`linear-gradient(135deg,${padColors[i]}33,${padColors[i]}22)`;
+d.style.borderColor=padColors[i]+'44';
+d.innerHTML=`<div>${['🎵','🎶','✨','💫','🌟','🎹','🔔','💜','🎀','🌸','🦋','🍬','🎪','🌈','🧀','🐭'][i]}</div><span>${n}</span>`;
+d.addEventListener('pointerdown',e=>{e.preventDefault();play(n);hit(d,padColors[i],e)});
+padGrid.appendChild(d);padEls.push(d)});
+
+function hit(el,color,e){
+el.classList.add('hit');setTimeout(()=>el.classList.remove('hit'),150);
+const r=document.createElement('div');r.className='ripple';
+const rect=el.getBoundingClientRect();
+r.style.left=(e?e.clientX-rect.left:rect.width/2)-0+'px';
+r.style.top=(e?e.clientY-rect.top:rect.height/2)-0+'px';
+el.appendChild(r);setTimeout(()=>r.remove(),500);
+sparkle(e?e.clientX:rect.left+rect.width/2,e?e.clientY:rect.top+rect.height/2,color)}
+
+// Piano
+const piano=document.getElementById('piano');
+const pianoNotes=['C4','C#4','D4','D#4','E4','F4','F#4','G4','G#4','A4','A#4','B4','C5'];
+pianoNotes.forEach(n=>{
+const k=document.createElement('div');
+k.className='key '+(n.includes('#')?'black':'white');
+k.textContent=n.replace('#','♯');
+k.addEventListener('pointerdown',e=>{e.preventDefault();play(n);k.classList.add('hit');setTimeout(()=>k.classList.remove('hit'),150);
+sparkle(e.clientX,e.clientY,n.includes('#')?'#c084fc':'#ff6b9d')});
+piano.appendChild(k)});
+
+// Sound selector
+document.querySelectorAll('.controls button').forEach(b=>{
+b.addEventListener('click',()=>{document.querySelectorAll('.controls button').forEach(x=>x.classList.remove('active'));
+b.classList.add('active');soundMode=b.dataset.sound})});
+
+// Sequencer
+const SEQ_LEN=16;const seqData=new Array(SEQ_LEN).fill(null);
+const seqEl=document.getElementById('seq');const seqSteps=[];
+for(let i=0;i<SEQ_LEN;i++){
+const s=document.createElement('div');s.className='seq-step';
+s.addEventListener('click',()=>{if(seqData[i]){seqData[i]=null;s.classList.remove('on');s.style.background=''}
+else{const ni=i%padNotes.length;seqData[i]=padNotes[ni];s.classList.add('on');s.style.background=padColors[ni]+'66'}});
+seqEl.appendChild(s);seqSteps.push(s)}
+
+let playing=false,step=0,intervalId=null;
+const playBtn=document.getElementById('playBtn');
+const tempoSlider=document.getElementById('tempoSlider');
+const tempoLabel=document.getElementById('tempoLabel');
+tempoSlider.addEventListener('input',()=>{tempoLabel.textContent=tempoSlider.value+' BPM';if(playing){clearInterval(intervalId);intervalId=setInterval(tick,60000/tempoSlider.value/4)}});
+
+playBtn.addEventListener('click',()=>{
+if(playing){playing=false;clearInterval(intervalId);playBtn.textContent='▶ Play';seqSteps.forEach(s=>s.classList.remove('current'))}
+else{playing=true;step=0;playBtn.textContent='⏸ Stop';intervalId=setInterval(tick,60000/tempoSlider.value/4)}});
+
+document.getElementById('clearBtn').addEventListener('click',()=>{seqData.fill(null);seqSteps.forEach(s=>{s.classList.remove('on');s.style.background=''})});
+
+function tick(){
+seqSteps.forEach(s=>s.classList.remove('current'));
+seqSteps[step].classList.add('current');
+if(seqData[step]){play(seqData[step]);const i=padNotes.indexOf(seqData[step]);if(i>=0&&padEls[i]){
+const r=padEls[i].getBoundingClientRect();hit(padEls[i],padColors[i],{clientX:r.left+r.width/2,clientY:r.top+r.height/2})}}
+step=(step+1)%SEQ_LEN}
+
+// Sparkle canvas
+const cvs=document.getElementById('fx'),ctx=cvs.getContext('2d');
+let W,H;const particles=[];
+function resize(){W=cvs.width=innerWidth;H=cvs.height=innerHeight}
+resize();addEventListener('resize',resize);
+
+function sparkle(x,y,color){for(let i=0;i<8;i++)particles.push({x,y,vx:(Math.random()-.5)*6,vy:(Math.random()-.5)*6-2,life:1,color,size:Math.random()*4+2})}
+
+(function draw(){requestAnimationFrame(draw);ctx.clearRect(0,0,W,H);
+for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.life-=.025;
+if(p.life<=0){particles.splice(i,1);continue}
+ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ctx.fill()}
+ctx.globalAlpha=1})();
+
+// Keyboard support
+const keyMap={a:'C4',w:'C#4',s:'D4',e:'D#4',d:'E4',f:'F4',t:'F#4',g:'G4',y:'G#4',h:'A4',u:'A#4',j:'B4',k:'C5'};
+document.addEventListener('keydown',e=>{if(e.repeat)return;const n=keyMap[e.key.toLowerCase()];if(n)play(n)});
+</script>
+</body>
+</html>

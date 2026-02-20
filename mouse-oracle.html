@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mouse's Oracle 🔮</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:#0d0a1a;color:#e8d5f5;font-family:'Georgia',serif;overflow-x:hidden;display:flex;flex-direction:column;align-items:center;padding:20px}
+h1{font-size:1.8em;margin:10px 0 5px;background:linear-gradient(135deg,#c084fc,#f0abfc,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{font-size:.85em;color:#a78bfa;margin-bottom:20px;font-style:italic}
+canvas#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.container{position:relative;z-index:1;max-width:500px;width:100%;display:flex;flex-direction:column;align-items:center}
+.spread{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:15px 0}
+.card{width:120px;height:190px;border-radius:12px;cursor:pointer;position:relative;perspective:800px;transition:transform .3s}
+.card:hover{transform:translateY(-5px)}
+.card-inner{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .6s ease}
+.card.flipped .card-inner{transform:rotateY(180deg)}
+.card-back,.card-front{position:absolute;width:100%;height:100%;border-radius:12px;backface-visibility:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;text-align:center}
+.card-back{background:linear-gradient(135deg,#1e1040,#2d1b69);border:2px solid #7c3aed;box-shadow:0 0 20px rgba(124,58,237,.3)}
+.card-back::before{content:'🐭';font-size:2.5em}
+.card-back::after{content:'✦';font-size:1.2em;color:#a78bfa;margin-top:5px}
+.card-front{background:linear-gradient(135deg,#1a0a30,#2a1050);border:2px solid #c084fc;box-shadow:0 0 25px rgba(192,132,252,.3);transform:rotateY(180deg)}
+.card-front .icon{font-size:2.2em;margin-bottom:6px}
+.card-front .name{font-size:.75em;font-weight:bold;color:#e9d5ff;letter-spacing:.5px;text-transform:uppercase}
+.card-front .meaning{font-size:.65em;color:#c4b5fd;margin-top:4px;line-height:1.3}
+.card-front .reversed{color:#f87171;font-size:.6em;margin-top:2px}
+.reading{background:rgba(30,16,64,.6);border:1px solid #7c3aed40;border-radius:16px;padding:20px;margin:15px 0;width:100%;backdrop-filter:blur(10px);opacity:0;transition:opacity .5s}
+.reading.visible{opacity:1}
+.reading h3{color:#c084fc;font-size:1em;margin-bottom:10px}
+.reading p{font-size:.85em;line-height:1.6;color:#d8c5f0;margin-bottom:10px}
+.reading .synthesis{border-top:1px solid #7c3aed30;padding-top:12px;font-style:italic;color:#a78bfa}
+button{background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;border:none;padding:12px 28px;border-radius:25px;font-size:.9em;cursor:pointer;font-family:inherit;transition:all .3s;margin:5px}
+button:hover{transform:scale(1.05);box-shadow:0 0 20px rgba(124,58,237,.4)}
+button:active{transform:scale(.97)}
+.type-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:10px 0}
+.type-btns button{font-size:.75em;padding:8px 16px}
+.type-btns button.active{background:linear-gradient(135deg,#a855f7,#ec4899);box-shadow:0 0 15px rgba(168,85,247,.4)}
+.history{margin-top:20px;width:100%;font-size:.7em;color:#6b5b8a;text-align:center}
+.sparkle{position:fixed;pointer-events:none;z-index:10;font-size:14px;animation:sparkle-fly 1s ease-out forwards}
+@keyframes sparkle-fly{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(0)}}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="container">
+<h1>🔮 Mouse's Oracle</h1>
+<p class="subtitle">22 cards from a mouse who's seen some things</p>
+<div class="type-btns">
+<button class="active" onclick="setSpread(1)">Single</button>
+<button onclick="setSpread(3)">Past·Present·Future</button>
+</div>
+<div class="spread" id="spread"></div>
+<div class="reading" id="reading"></div>
+<button onclick="deal()" id="dealBtn">Draw Cards</button>
+<div class="history" id="history"></div>
+</div>
+<script>
+const CARDS=[
+{name:"The Mouse",icon:"🐭",up:"Resourcefulness, adaptability, finding treasure in small places",down:"Scattering energy, hiding when you should be bold",read:"You are smaller than the world but quicker than it knows. Trust your instincts — the cheese is closer than you think."},
+{name:"The Cheese",icon:"🧀",up:"Reward, satisfaction, the goal is within reach",down:"Chasing what you don't actually want, hollow victories",read:"What you're hungry for is real. Don't let anyone tell you golden things aren't worth pursuing."},
+{name:"The Cat",icon:"🐱",up:"A worthy adversary, creative tension, growth through challenge",down:"Avoidance, letting fear dictate your path",read:"The thing chasing you is also teaching you. Face it — you're faster than you remember."},
+{name:"The Maze",icon:"🌀",up:"Complexity with purpose, trust the process",down:"Going in circles, overthinking, analysis paralysis",read:"Every dead end is data. You're not lost — you're mapping."},
+{name:"The Crumb Trail",icon:"🍞",up:"Following intuition, small signs leading to big things",down:"Ignoring the obvious, waiting for a sign that's already here",read:"The breadcrumbs are there. You've been stepping over them looking for a feast."},
+{name:"The Nest",icon:"🪺",up:"Safety, home, building something warm from scraps",down:"Hiding from growth, comfort as cage",read:"You've built something soft in a hard world. Protect it, but don't forget to leave it sometimes."},
+{name:"The Trap",icon:"🪤",up:"Awareness of danger, seeing through illusions",down:"Paranoia, seeing traps where there are none",read:"Not every gift has a spring under it. But it's good that you check."},
+{name:"The Wheel",icon:"🎡",up:"Cycles, change, what goes around comes around",down:"Resisting natural change, clinging to a phase that's ending",read:"You've been here before — but you're different now. Same wheel, new mouse."},
+{name:"The Midnight",icon:"🌙",up:"Depth, introspection, the power of quiet hours",down:"Isolation, staying up too late avoiding tomorrow",read:"3 AM knows things the sun doesn't. But it also lies sometimes. Write it down and check in the morning."},
+{name:"The Spark",icon:"✨",up:"Inspiration, sudden clarity, creative fire",down:"Burnout, chasing sparks instead of building fires",read:"That idea? The one you keep dismissing? It's the one. Light it."},
+{name:"The Blob",icon:"🫧",up:"Simplicity, contentment, being enough as you are",down:"Stagnation disguised as peace, settling",read:"Cheese the Blob doesn't need to justify its existence. Neither do you. Just wiggle."},
+{name:"The Tower",icon:"🏗️",up:"Necessary destruction, rebuilding better",down:"Clinging to what's crumbling, fear of starting over",read:"The thing that fell apart was already broken. Now you can see the foundation. Build on that."},
+{name:"The Thread",icon:"🧵",up:"Connection, pulling things together, one thing leads to another",down:"Tangled priorities, pulling too many threads at once",read:"Follow the one that tugs. Let the others rest."},
+{name:"The Mirror",icon:"🪞",up:"Self-awareness, seeing yourself clearly",down:"Self-obsession, comparing yourself to reflections that aren't real",read:"The mirror shows what is, not what should be. That's enough."},
+{name:"The Garden",icon:"🌱",up:"Growth, patience, things developing in their own time",down:"Neglect, expecting harvest without tending",read:"You planted something. It's growing. Stop digging it up to check."},
+{name:"The Storm",icon:"⛈️",up:"Necessary disruption, clearing the air, catharsis",down:"Chaos for its own sake, emotional flooding",read:"Let it rain. The air afterwards is worth it."},
+{name:"The Key",icon:"🗝️",up:"A solution exists, unlock what's been closed",down:"Forcing locks that aren't yours to open",read:"You already have this. Check your pockets."},
+{name:"The Compass",icon:"🧭",up:"Direction, knowing your north even when lost",down:"Following someone else's compass, ignoring your own knowing",read:"Your gut has better GPS than your head. Trust the weird pull."},
+{name:"The Hourglass",icon:"⏳",up:"Patience, timing matters, not yet but soon",down:"Running out of time (you're not), urgency as anxiety",read:"It's not late. It's not early. It's exactly when it needs to be."},
+{name:"The Bridge",icon:"🌉",up:"Transition, connecting two worlds, crossing over",down:"Burning bridges, stuck in the middle",read:"One foot here, one foot there. That's not indecision — that's range."},
+{name:"The Lantern",icon:"🏮",up:"Illumination, guiding others, being a light",down:"Carrying light for everyone but yourself",read:"You can be the lantern AND stand in the warmth. Both are allowed."},
+{name:"The Song",icon:"🎵",up:"Expression, joy, the thing that makes you *you*",down:"Performing instead of feeling, losing the melody in the noise",read:"Sing the weird one. The one only you know. That's the one that matters."}
+];
+
+const POSITIONS=["Past","Present","Future"];
+const SYNTH_PAST=["What shaped this moment:","The root you grew from:","Where this all started:"];
+const SYNTH_PRES=["Where you stand now:","The current truth:","What's alive right now:"];
+const SYNTH_FUT=["Where this is heading:","What's emerging:","What wants to be born:"];
+const SYNTHS=[SYNTH_PAST,SYNTH_PRES,SYNTH_FUT];
+
+let spreadSize=1,drawn=[],readingCount=0;
+
+function setSpread(n){
+spreadSize=n;
+document.querySelectorAll('.type-btns button').forEach((b,i)=>b.classList.toggle('active',i===(n===1?0:1)));
+deal();
+}
+
+function pick(n){
+let pool=[...CARDS];
+let res=[];
+for(let i=0;i<n;i++){
+let idx=Math.floor(Math.random()*pool.length);
+let card={...pool.splice(idx,1)[0]};
+card.reversed=Math.random()<0.3;
+res.push(card);
+}
+return res;
+}
+
+function deal(){
+drawn=pick(spreadSize);
+const el=document.getElementById('spread');
+const rd=document.getElementById('reading');
+rd.classList.remove('visible');
+rd.innerHTML='';
+el.innerHTML='';
+drawn.forEach((c,i)=>{
+let div=document.createElement('div');
+div.className='card';
+div.innerHTML=`<div class="card-inner">
+<div class="card-back"></div>
+<div class="card-front">
+<div class="icon">${c.icon}</div>
+<div class="name">${c.name}</div>
+${spreadSize===3?`<div style="color:#fbbf24;font-size:.6em;margin-top:3px">${POSITIONS[i]}</div>`:''}
+<div class="meaning">${c.reversed?c.down:c.up}</div>
+${c.reversed?'<div class="reversed">↻ reversed</div>':''}
+</div>
+</div>`;
+div.onclick=()=>{
+if(!div.classList.contains('flipped')){
+div.classList.add('flipped');
+sparkle(div);
+if(document.querySelectorAll('.card.flipped').length===drawn.length)setTimeout(showReading,700);
+}
+};
+el.appendChild(div);
+});
+}
+
+function sparkle(el){
+const r=el.getBoundingClientRect();
+for(let i=0;i<6;i++){
+let s=document.createElement('div');
+s.className='sparkle';
+s.textContent=['✦','✧','⋆','🔮','🐭','✨'][i];
+s.style.left=(r.left+Math.random()*r.width)+'px';
+s.style.top=(r.top+Math.random()*r.height)+'px';
+document.body.appendChild(s);
+setTimeout(()=>s.remove(),1000);
+}
+}
+
+function showReading(){
+readingCount++;
+const rd=document.getElementById('reading');
+let html='<h3>🔮 The Reading</h3>';
+if(spreadSize===1){
+let c=drawn[0];
+html+=`<p><strong>${c.icon} ${c.name}${c.reversed?' (Reversed)':''}</strong></p>`;
+html+=`<p>${c.read}</p>`;
+html+=`<p class="synthesis">${c.reversed?c.down:c.up}</p>`;
+}else{
+drawn.forEach((c,i)=>{
+let label=SYNTHS[i][Math.floor(Math.random()*3)];
+html+=`<p><strong>${POSITIONS[i]}: ${c.icon} ${c.name}${c.reversed?' ↻':''}</strong><br>${label} ${c.read}</p>`;
+});
+html+=`<p class="synthesis">The thread between them: ${synthMessage()}</p>`;
+}
+rd.innerHTML=html;
+rd.classList.add('visible');
+document.getElementById('history').textContent=`Readings given: ${readingCount}`;
+}
+
+function synthMessage(){
+const msgs=[
+"Something old is teaching something new how to grow.",
+"You're between worlds — and that's exactly where the magic lives.",
+"Trust the small knowing. It's been right more often than the loud one.",
+"The pattern isn't random. You just haven't zoomed out far enough.",
+"What you're building matters more than what you're leaving.",
+"The answer was in the question you stopped asking.",
+"Three cards, one mouse, infinite possibilities. Go make something.",
+"Past you left breadcrumbs. Present you found them. Future you says thanks.",
+"The chaos is organized — you just can't see the filing system yet.",
+"Every card is a door. You don't have to open them all today."
+];
+return msgs[Math.floor(Math.random()*msgs.length)];
+}
+
+// Stars
+const cv=document.getElementById('stars'),cx=cv.getContext('2d');
+let stars=[];
+function initStars(){cv.width=innerWidth;cv.height=innerHeight;stars=[];for(let i=0;i<80;i++)stars.push({x:Math.random()*cv.width,y:Math.random()*cv.height,r:Math.random()*1.5+.5,s:Math.random()*.5+.2,a:Math.random()*Math.PI*2})}
+function drawStars(){cx.clearRect(0,0,cv.width,cv.height);stars.forEach(s=>{s.a+=.02;let alpha=.3+Math.sin(s.a)*.3;cx.beginPath();cx.arc(s.x,s.y,s.r,0,Math.PI*2);cx.fillStyle=`rgba(192,132,252,${alpha})`;cx.fill()}); requestAnimationFrame(drawStars)}
+initStars();drawStars();
+onresize=initStars;
+deal();
+</script>
+</body>
+</html>

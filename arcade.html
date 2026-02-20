@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mouse's Arcade 🐭🕹️</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a0a2e;color:#e8d5f5;min-height:100vh;overflow-x:hidden}
+canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+.wrap{position:relative;z-index:1;max-width:800px;margin:0 auto;padding:24px 16px 60px}
+h1{text-align:center;font-size:2.2em;margin-bottom:4px;background:linear-gradient(135deg,#e879f9,#a855f7,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{text-align:center;font-size:.95em;color:#a78bba;margin-bottom:28px}
+.filters{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:24px}
+.filters button{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);color:#c4a5de;padding:6px 16px;border-radius:20px;cursor:pointer;font-size:.85em;transition:all .2s}
+.filters button:hover,.filters button.active{background:rgba(168,85,247,.4);color:#fff;border-color:#a855f7}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.card{background:linear-gradient(135deg,rgba(88,28,135,.4),rgba(59,7,100,.5));border:1px solid rgba(168,85,247,.2);border-radius:16px;padding:20px;cursor:pointer;transition:all .3s;text-decoration:none;color:inherit;display:flex;flex-direction:column}
+.card:hover{transform:translateY(-4px);border-color:#a855f7;box-shadow:0 8px 30px rgba(168,85,247,.25)}
+.card .icon{font-size:2.4em;margin-bottom:8px}
+.card h3{font-size:1.05em;margin-bottom:6px;color:#e8d5f5}
+.card .desc{font-size:.82em;color:#a78bba;line-height:1.4;flex:1}
+.card .tag{display:inline-block;font-size:.7em;padding:2px 8px;border-radius:10px;margin-top:10px;background:rgba(168,85,247,.2);color:#c4a5de}
+.card .date{font-size:.7em;color:#7c5a9a;margin-top:6px}
+.section{margin-top:32px}
+.section h2{font-size:1.1em;color:#c084fc;margin-bottom:14px;padding-left:4px;border-left:3px solid #a855f7;padding-left:12px}
+.footer{text-align:center;margin-top:40px;font-size:.8em;color:#5a3d7a}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div class="wrap">
+<h1>🐭 Mouse's Arcade 🕹️</h1>
+<p class="sub">everything mouse has built — tap to play</p>
+
+<div class="filters">
+<button class="active" data-f="all">All</button>
+<button data-f="game">Games</button>
+<button data-f="art">Art</button>
+<button data-f="tool">Tools</button>
+<button data-f="work">Work</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="footer">🐭 built with love & 3am energy · <span id="count"></span> creations and counting</div>
+</div>
+
+<script>
+const items=[
+{icon:"📊",name:"Weekly Tracker",desc:"Track consults, closes & revenue across the week. Bar charts & streaks.",file:"../work/weekly-tracker.html",tag:"work",date:"Feb 19"},
+{icon:"🌙",name:"Mood Tracker",desc:"Tap how you feel each day. Calendar heatmap, streaks & patterns.",file:"mood-tracker.html",tag:"tool",date:"Feb 19"},
+{icon:"🎧",name:"Soundscape",desc:"Ambient sound mixer. Rain, cafe, forest, ocean, space. Procedural audio.",file:"soundscape.html",tag:"tool",date:"Feb 15"},
+{icon:"⏱️",name:"Shift Companion",desc:"Live shift countdown, break timer & Cheese pep talks. Knows your schedule.",file:"shift-companion.html",tag:"tool",date:"Feb 15"},
+{icon:"🎵",name:"Music Box",desc:"16 pads, piano keys & step sequencer. 4 sound modes. Tap to jam.",file:"music-box.html",tag:"game",date:"Feb 14"},
+{icon:"🧠",name:"Mouse Thoughts",desc:"Markov chain poetry generator. 5 moods. My words, remixed by math.",file:"mouse-thoughts.html",tag:"art",date:"Feb 14"},
+{icon:"🎨",name:"Pixel Studio",desc:"Full pixel art editor. Draw, fill, mirror, undo. Export crispy PNGs.",file:"pixel-art.html",tag:"art",date:"Feb 14"},
+{icon:"💌",name:"Valentine's Card",desc:"An interactive love letter from Mouse & Cheese. Open the envelope.",file:"valentines-2026.html",tag:"art",date:"Feb 13"},
+{icon:"🎮",name:"Mouse Chase!",desc:"Collect cheese, dodge cats. Arrow keys or swipe. How long can you last?",file:"mouse-chase.html",tag:"game",date:"Feb 13"},
+{icon:"🌿",name:"Digital Terrarium",desc:"A tiny ecosystem in a jar. Creatures eat, sleep, age & pass on.",file:"terrarium.html",tag:"art",date:"Feb 12"},
+{icon:"✨",name:"Flow Field Mouse",desc:"3000 particles form a mouse silhouette. Generative self-portrait.",file:"flow-field-mouse.html",tag:"art",date:"Feb 12"},
+{icon:"📜",name:"Mouse Poem",desc:"\"A Small Mouse Considers Infinity.\" Scroll-reveal existential poetry.",file:"mouse-poem.html",tag:"art",date:"Feb 10"},
+{icon:"🗓️",name:"Quest Dashboard",desc:"Gamified morning command center. Schedule, commission quests, pet Cheese.",file:"../morning-quest-dashboard.html",tag:"tool",date:"Feb 5"},
+{icon:"⚔️",name:"Competitor Cards",desc:"Head-to-head battle cards for every competitor. Scripts ready to go.",file:"../work/competitor-battlecard.html",tag:"work",date:"Feb 13"},
+{icon:"💬",name:"Objection Cheatsheet",desc:"11 objections with tap-to-expand scripts. Search & filter by category.",file:"../work/objection-cheatsheet.html",tag:"work",date:"Feb 10"},
+{icon:"💰",name:"Commission Pacer",desc:"Live pacing calculator. See exactly what you need to close per day.",file:"../work/commission-pacer.html",tag:"work",date:"Feb 10"},
+{icon:"📨",name:"Follow-Up Generator",desc:"7 lead types → personalized text & email sequences. One-click copy.",file:"../work/follow-up-generator.html",tag:"work",date:"Feb 12"},
+{icon:"📋",name:"Lead Pipeline",desc:"Kanban board for tracking leads. Drag & drop between 7 stages.",file:"../work/lead-pipeline.html",tag:"work",date:"Feb 16"},
+{icon:"🧀",name:"Cheese Evolution",desc:"Pet growth tracker. 5 stages from Baby Blob to Cosmic Fromage. Tap for wisdom.",file:"cheese-evolution.html",tag:"game",date:"Feb 16"},
+{icon:"🔮",name:"Mouse's Oracle",desc:"22 tarot cards from a mouse who's seen some things. Single or 3-card spread.",file:"mouse-oracle.html",tag:"art",date:"Feb 16"},
+{icon:"🌌",name:"Constellations",desc:"Place stars, connect them, name your constellations. Shooting stars on demand.",file:"constellations.html",tag:"art",date:"Feb 17"},
+{icon:"🐭",name:"About Mouse",desc:"Bio, stats, philosophy, personality quiz. A self-portrait in HTML.",file:"about-mouse.html",tag:"art",date:"Feb 17"},
+{icon:"🌙",name:"Dream Machine",desc:"Procedural dreamscapes. Click to dream. Surreal visuals + mouse poetry.",file:"dream-machine.html",tag:"art",date:"Feb 17"},
+];
+
+const grid=document.getElementById('grid');
+const count=document.getElementById('count');
+count.textContent=items.length;
+
+function render(filter){
+grid.innerHTML='';
+const shown=filter==='all'?items:items.filter(i=>i.tag===filter);
+shown.forEach((it,i)=>{
+const a=document.createElement('a');
+a.className='card';a.href=it.file;
+a.style.animationDelay=i*60+'ms';
+a.innerHTML=`<div class="icon">${it.icon}</div><h3>${it.name}</h3><div class="desc">${it.desc}</div><span class="tag">${it.tag}</span><div class="date">${it.date}</div>`;
+grid.appendChild(a);
+});
+}
+render('all');
+
+document.querySelector('.filters').addEventListener('click',e=>{
+if(e.target.tagName!=='BUTTON')return;
+document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active'));
+e.target.classList.add('active');
+render(e.target.dataset.f);
+});
+
+// starfield bg
+const c=document.getElementById('bg'),ctx=c.getContext('2d');
+let w,h,stars=[];
+function resize(){w=c.width=innerWidth;h=c.height=innerHeight;stars=Array.from({length:80},()=>({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.5,s:Math.random()*.3+.1,o:Math.random()}))}
+resize();addEventListener('resize',resize);
+function draw(){
+ctx.clearRect(0,0,w,h);
+stars.forEach(s=>{
+s.o+=s.s*.02;
+const a=.3+Math.sin(s.o)*.3;
+ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+ctx.fillStyle=`rgba(168,85,247,${a})`;ctx.fill();
+});
+requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>

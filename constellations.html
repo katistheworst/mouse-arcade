@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🌌 Mouse's Constellation Maker</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#e0d0f0;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100vh;user-select:none}
+canvas{display:block;cursor:crosshair}
+#ui{position:fixed;top:12px;left:12px;z-index:10;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+#ui>*{pointer-events:auto}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap}
+.btn{background:rgba(120,60,180,.4);border:1px solid rgba(180,120,255,.3);color:#e0d0f0;padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s}
+.btn:hover{background:rgba(160,80,220,.5);border-color:rgba(200,150,255,.5)}
+.btn.active{background:rgba(180,80,255,.6);border-color:#c090ff;box-shadow:0 0 12px rgba(180,80,255,.3)}
+#info{font-size:12px;color:rgba(200,180,230,.6);max-width:320px;line-height:1.4}
+#name-input{position:fixed;display:none;z-index:20}
+#name-input input{background:rgba(20,10,40,.9);border:1px solid #a060e0;color:#e0d0f0;padding:6px 12px;border-radius:12px;font-size:14px;outline:none;width:180px}
+#constellation-list{position:fixed;top:12px;right:12px;z-index:10;display:flex;flex-direction:column;gap:4px;max-height:60vh;overflow-y:auto;scrollbar-width:thin}
+.citem{background:rgba(120,60,180,.25);border:1px solid rgba(180,120,255,.2);padding:4px 10px;border-radius:12px;font-size:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;backdrop-filter:blur(6px)}
+.citem:hover{background:rgba(160,80,220,.35)}
+.citem .del{opacity:.4;cursor:pointer;font-size:10px}.citem .del:hover{opacity:1;color:#ff6090}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(120,60,180,.7);color:#f0e0ff;padding:8px 20px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .3s;z-index:30;backdrop-filter:blur(8px)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div class="toolbar">
+    <button class="btn active" data-tool="star" title="Place stars">⭐ Star</button>
+    <button class="btn" data-tool="connect" title="Connect stars with lines">🔗 Connect</button>
+    <button class="btn" data-tool="erase" title="Remove stars">🗑️ Erase</button>
+    <button class="btn" data-tool="move" title="Drag stars">✋ Move</button>
+  </div>
+  <div class="toolbar">
+    <button class="btn" id="name-btn">✏️ Name</button>
+    <button class="btn" id="clear-btn">🌑 Clear All</button>
+    <button class="btn" id="save-btn">💾 Save PNG</button>
+    <button class="btn" id="shooting-btn">🌠 Shooting Star</button>
+  </div>
+  <div id="info">Click to place stars. Connect them to form constellations. Name your creations. ✨</div>
+</div>
+<div id="name-input"><input type="text" placeholder="Name this constellation..." maxlength="30"></div>
+<div id="constellation-list"></div>
+<div id="toast"></div>
+
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H;
+function resize(){W=C.width=innerWidth;H=C.height=innerHeight}
+resize();addEventListener('resize',resize);
+
+// State
+let tool='star', stars=[], lines=[], constellations=[], bgStars=[];
+let connectStart=null, dragStar=null, dragOff={x:0,y:0};
+let shootingStars=[];
+
+// Generate background stars
+function initBg(){bgStars=[];for(let i=0;i<300;i++)bgStars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+.3,b:Math.random(),s:Math.random()*.005+.002})}
+initBg();
+
+// Toolbar
+document.querySelectorAll('[data-tool]').forEach(b=>{
+  b.onclick=()=>{document.querySelectorAll('[data-tool]').forEach(x=>x.classList.remove('active'));b.classList.add('active');tool=b.dataset.tool;connectStart=null}
+});
+
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.style.opacity=1;setTimeout(()=>e.style.opacity=0,2000)}
+
+function findStar(x,y,r=18){return stars.find(s=>Math.hypot(s.x-x,s.y-y)<r)}
+
+// Canvas events
+C.addEventListener('pointerdown',e=>{
+  const mx=e.clientX,my=e.clientY;
+  if(tool==='star'){
+    const s={x:mx,y:my,r:Math.random()*2+1.5,id:Date.now(),constellation:null,pulse:0};
+    stars.push(s);
+  }else if(tool==='connect'){
+    const s=findStar(mx,my);
+    if(s){if(!connectStart){connectStart=s;s.pulse=1}else if(s!==connectStart){
+      if(!lines.find(l=>(l.a===connectStart&&l.b===s)||(l.a===s&&l.b===connectStart)))
+        lines.push({a:connectStart,b:s});
+      connectStart.pulse=0;connectStart=null;
+    }}
+  }else if(tool==='erase'){
+    const s=findStar(mx,my);
+    if(s){lines=lines.filter(l=>l.a!==s&&l.b!==s);stars=stars.filter(x=>x!==s)}
+  }else if(tool==='move'){
+    const s=findStar(mx,my,24);
+    if(s){dragStar=s;dragOff={x:s.x-mx,y:s.y-my}}
+  }
+});
+C.addEventListener('pointermove',e=>{
+  if(dragStar){dragStar.x=e.clientX+dragOff.x;dragStar.y=e.clientY+dragOff.y}
+});
+C.addEventListener('pointerup',()=>{dragStar=null});
+
+// Name constellation
+const nameInput=document.getElementById('name-input'),nameField=nameInput.querySelector('input');
+document.getElementById('name-btn').onclick=()=>{
+  if(stars.length<2){toast('Place at least 2 stars first!');return}
+  nameInput.style.display='block';nameInput.style.left='50%';nameInput.style.top='50%';
+  nameInput.style.transform='translate(-50%,-50%)';nameField.value='';nameField.focus();
+};
+nameField.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&nameField.value.trim()){
+    const name=nameField.value.trim();
+    const cStars=[...stars];const cLines=[...lines];
+    const col=`hsl(${Math.random()*60+250},70%,70%)`;
+    constellations.push({name,stars:cStars.map(s=>({...s})),lines:cLines.map(l=>({ax:l.a.x,ay:l.a.y,bx:l.b.x,by:l.b.y})),color:col});
+    updateList();toast(`✨ "${name}" saved!`);
+    nameInput.style.display='none';
+  }else if(e.key==='Escape')nameInput.style.display='none';
+});
+
+function updateList(){
+  const el=document.getElementById('constellation-list');
+  el.innerHTML=constellations.map((c,i)=>`<div class="citem"><span>${c.name} (${c.stars.length}⭐)</span><span class="del" data-i="${i}">✕</span></div>`).join('');
+  el.querySelectorAll('.del').forEach(d=>d.onclick=e=>{
+    e.stopPropagation();constellations.splice(+d.dataset.i,1);updateList()});
+}
+
+// Shooting star
+document.getElementById('shooting-btn').onclick=()=>{
+  shootingStars.push({x:Math.random()*W*.5,y:Math.random()*H*.3,vx:4+Math.random()*4,vy:2+Math.random()*3,life:1,trail:[]});
+};
+
+// Clear
+document.getElementById('clear-btn').onclick=()=>{
+  if(stars.length===0&&constellations.length===0)return;
+  stars=[];lines=[];connectStart=null;toast('🌑 Canvas cleared');
+};
+
+// Save
+document.getElementById('save-btn').onclick=()=>{
+  const link=document.createElement('a');link.download='constellation-'+Date.now()+'.png';link.href=C.toDataURL();link.click();toast('💾 Saved!');
+};
+
+// Render
+let t=0;
+function draw(){
+  t+=.016;
+  X.fillStyle='#0a0a1a';X.fillRect(0,0,W,H);
+  
+  // Subtle nebula
+  const g=X.createRadialGradient(W*.3,H*.4,0,W*.3,H*.4,W*.5);
+  g.addColorStop(0,'rgba(60,20,100,.08)');g.addColorStop(1,'transparent');
+  X.fillStyle=g;X.fillRect(0,0,W,H);
+  const g2=X.createRadialGradient(W*.7,H*.6,0,W*.7,H*.6,W*.4);
+  g2.addColorStop(0,'rgba(20,40,100,.06)');g2.addColorStop(1,'transparent');
+  X.fillStyle=g2;X.fillRect(0,0,W,H);
+
+  // Background stars
+  bgStars.forEach(s=>{
+    const twinkle=.5+.5*Math.sin(t*s.s*600+s.b*100);
+    X.globalAlpha=twinkle*.6+.2;
+    X.fillStyle='#c0b8e0';
+    X.beginPath();X.arc(s.x,s.y,s.r,0,Math.PI*2);X.fill();
+  });
+  X.globalAlpha=1;
+
+  // Saved constellations (faded)
+  constellations.forEach(c=>{
+    X.strokeStyle=c.color;X.lineWidth=1;X.globalAlpha=.25;
+    c.lines.forEach(l=>{X.beginPath();X.moveTo(l.ax,l.ay);X.lineTo(l.bx,l.by);X.stroke()});
+    X.globalAlpha=.3;X.fillStyle=c.color;
+    c.stars.forEach(s=>{X.beginPath();X.arc(s.x,s.y,s.r+.5,0,Math.PI*2);X.fill()});
+    // Label
+    if(c.stars.length){
+      let cx=0,cy=0;c.stars.forEach(s=>{cx+=s.x;cy+=s.y});cx/=c.stars.length;cy/=c.stars.length;
+      X.globalAlpha=.35;X.font='11px "Segoe UI",sans-serif';X.textAlign='center';
+      X.fillStyle=c.color;X.fillText(c.name,cx,cy-14);
+    }
+  });
+  X.globalAlpha=1;
+
+  // Active lines
+  X.strokeStyle='rgba(200,160,255,.5)';X.lineWidth=1.5;
+  lines.forEach(l=>{X.beginPath();X.moveTo(l.a.x,l.a.y);X.lineTo(l.b.x,l.b.y);X.stroke()});
+
+  // Connect preview
+  if(tool==='connect'&&connectStart){
+    X.strokeStyle='rgba(200,160,255,.2)';X.setLineDash([4,4]);
+    X.beginPath();X.moveTo(connectStart.x,connectStart.y);
+    // just show pulsing star
+    X.setLineDash([]);
+  }
+
+  // Stars
+  stars.forEach(s=>{
+    s.pulse=Math.max(0,s.pulse-.02);
+    const glow=s.r+2+s.pulse*8;
+    const gr=X.createRadialGradient(s.x,s.y,0,s.x,s.y,glow);
+    gr.addColorStop(0,'rgba(230,210,255,.9)');gr.addColorStop(.4,'rgba(200,160,255,.3)');gr.addColorStop(1,'transparent');
+    X.fillStyle=gr;X.beginPath();X.arc(s.x,s.y,glow,0,Math.PI*2);X.fill();
+    X.fillStyle='#f0e8ff';X.beginPath();X.arc(s.x,s.y,s.r,0,Math.PI*2);X.fill();
+  });
+
+  // Shooting stars
+  shootingStars=shootingStars.filter(s=>{
+    s.x+=s.vx;s.y+=s.vy;s.life-=.012;
+    s.trail.push({x:s.x,y:s.y,a:s.life});
+    if(s.trail.length>30)s.trail.shift();
+    for(let i=0;i<s.trail.length-1;i++){
+      const p=s.trail[i],q=s.trail[i+1];
+      X.strokeStyle=`rgba(220,200,255,${p.a*(i/s.trail.length)*.6})`;
+      X.lineWidth=2*(i/s.trail.length);
+      X.beginPath();X.moveTo(p.x,p.y);X.lineTo(q.x,q.y);X.stroke();
+    }
+    X.fillStyle=`rgba(255,250,255,${s.life})`;
+    X.beginPath();X.arc(s.x,s.y,2,0,Math.PI*2);X.fill();
+    return s.life>0;
+  });
+
+  requestAnimationFrame(draw);
+}
+draw();
+
+// Resize bg stars on window resize
+addEventListener('resize',()=>{initBg()});
+</script>
+</body>
+</html>

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mouse's Desk — Lo-Fi Vibes</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; overflow: hidden; font-family: 'Courier New', monospace; }
+canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer; }
+#ui {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 12px; z-index: 10;
+}
+.btn {
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  color: #c4b5a0; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+  font-family: inherit; font-size: 13px; transition: all 0.3s;
+}
+.btn:hover { background: rgba(255,255,255,0.15); }
+.btn.active { background: rgba(255,200,100,0.2); border-color: rgba(255,200,100,0.4); }
+#clock {
+  position: fixed; top: 20px; right: 24px; color: #7a6f60; font-size: 14px;
+  z-index: 10; text-align: right; line-height: 1.6;
+}
+#title {
+  position: fixed; top: 20px; left: 24px; color: #5a5040; font-size: 11px;
+  z-index: 10; letter-spacing: 2px; text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+<div id="title">Mouse's Desk</div>
+<div id="clock"></div>
+<canvas id="c"></canvas>
+<div id="ui">
+  <button class="btn active" onclick="toggleTime('day')">☀️ Day</button>
+  <button class="btn" onclick="toggleTime('sunset')">🌅 Sunset</button>
+  <button class="btn" onclick="toggleTime('night')">🌙 Night</button>
+  <button class="btn" onclick="toggleRain()">🌧️ Rain</button>
+  <button class="btn" onclick="toggleMusic()">🎵 Lo-Fi</button>
+</div>
+
+<script>
+const C = document.getElementById('c');
+const ctx = C.getContext('2d');
+const PX = 4; // pixel scale
+let W, H, pw, ph;
+let timeMode = 'day';
+let raining = false;
+let musicOn = false;
+let frame = 0;
+let raindrops = [];
+let steam = [];
+let audioCtx, gainNode;
+
+// Color palettes per time
+const palettes = {
+  day:    { sky: '#87CEEB', wall: '#e8d5b7', desk: '#8B6914', wood: '#6B4F1A', screen: '#2d3436', screenGlow: '#a8e6cf', lamp: '#f9ca24', ambient: 'rgba(255,240,200,0.03)', windowLight: '#fffbe6' },
+  sunset: { sky: '#ff7675', wall: '#d4a574', desk: '#7a5c1e', wood: '#5a4018', screen: '#2d3436', screenGlow: '#fdcb6e', lamp: '#f0932b', ambient: 'rgba(255,150,80,0.04)', windowLight: '#ffeaa7' },
+  night:  { sky: '#0c1445', wall: '#3d3252', desk: '#4a3a1a', wood: '#3a2a10', screen: '#1a1a2e', screenGlow: '#74b9ff', lamp: '#ffeaa7', ambient: 'rgba(100,100,255,0.02)', windowLight: '#2d3436' }
+};
+
+function resize() {
+  W = C.width = window.innerWidth;
+  H = C.height = window.innerHeight;
+  pw = Math.floor(W / PX);
+  ph = Math.floor(H / PX);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// pixel rect
+function pr(x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * PX, y * PX, w * PX, h * PX);
+}
+
+// Draw the scene
+function drawScene() {
+  const p = palettes[timeMode];
+  const t = frame * 0.02;
+
+  // Sky / background
+  pr(0, 0, pw, ph, p.sky);
+
+  // Wall
+  pr(0, Math.floor(ph * 0.15), pw, ph, p.wall);
+
+  // Window (top center)
+  const winW = 40, winH = 30;
+  const winX = Math.floor(pw / 2) - 20;
+  const winY = Math.floor(ph * 0.08);
+  pr(winX - 1, winY - 1, winW + 2, winH + 2, '#5a4a30'); // frame
+  pr(winX, winY, winW, winH, p.sky); // sky through window
+  pr(winX + winW/2 - 0.5, winY, 1, winH, '#5a4a30'); // cross
+  pr(winX, winY + winH/2 - 0.5, winW, 1, '#5a4a30');
+
+  // Stars in night mode
+  if (timeMode === 'night') {
+    for (let i = 0; i < 8; i++) {
+      const sx = winX + 3 + (i * 5) % (winW - 6);
+      const sy = winY + 2 + (i * 7) % (winH/2 - 2);
+      const blink = Math.sin(t * 2 + i * 1.5) > 0.3;
+      if (blink) pr(sx, sy, 1, 1, '#fff');
+    }
+  }
+
+  // Desk surface
+  const deskY = Math.floor(ph * 0.55);
+  const deskH = Math.floor(ph * 0.08);
+  pr(0, deskY, pw, deskH, p.desk);
+  pr(0, deskY, pw, 1, '#9a7a2a'); // highlight edge
+  pr(0, deskY + deskH, pw, ph - deskY - deskH, p.wood); // desk front
+
+  // Monitor
+  const monW = 30, monH = 20;
+  const monX = Math.floor(pw / 2) - 15;
+  const monY = deskY - monH - 4;
+  pr(monX - 1, monY - 1, monW + 2, monH + 2, '#333'); // bezel
+  pr(monX, monY, monW, monH, p.screen); // screen
+
+  // Screen content — animated code
+  for (let row = 0; row < 8; row++) {
+    const lineLen = 5 + Math.floor(Math.sin(row * 2 + t) * 3 + 8);
+    const col = row % 3 === 0 ? p.screenGlow : (row % 3 === 1 ? '#636e72' : '#dfe6e9');
+    const indent = row % 2 === 0 ? 2 : 4;
+    pr(monX + indent, monY + 2 + row * 2, Math.min(lineLen, monW - indent - 2), 1, col);
+  }
+
+  // Blinking cursor
+  if (Math.sin(t * 4) > 0) {
+    pr(monX + 6, monY + 2 + 8 * 2, 1, 1, p.screenGlow);
+  }
+
+  // Monitor stand
+  pr(monX + monW/2 - 2, deskY - 4, 4, 4, '#444');
+  pr(monX + monW/2 - 4, deskY - 1, 8, 1, '#444');
+
+  // Screen glow
+  if (timeMode === 'night') {
+    ctx.fillStyle = 'rgba(116, 185, 255, 0.06)';
+    ctx.fillRect((monX - 10) * PX, (monY - 5) * PX, (monW + 20) * PX, (monH + 15) * PX);
+  }
+
+  // Desk lamp (left side)
+  const lampX = monX - 18;
+  const lampY = deskY - 12;
+  pr(lampX + 3, deskY - 2, 2, 2, '#555'); // base
+  pr(lampX + 3, lampY, 1, deskY - lampY - 2, '#555'); // pole
+  pr(lampX, lampY, 7, 3, p.lamp); // shade
+  // lamp glow
+  if (timeMode !== 'day') {
+    ctx.fillStyle = `rgba(255, 230, 150, 0.08)`;
+    ctx.beginPath();
+    ctx.arc((lampX + 3.5) * PX, (lampY + 4) * PX, 30, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Coffee mug (right side)
+  const mugX = monX + monW + 6;
+  const mugY = deskY - 5;
+  pr(mugX, mugY, 5, 5, '#d4a574'); // mug body
+  pr(mugX + 1, mugY + 1, 3, 1, '#3d2b1f'); // coffee
+  pr(mugX + 5, mugY + 1, 2, 3, '#d4a574'); // handle
+
+  // Steam from coffee
+  for (let i = 0; i < 3; i++) {
+    const sx = mugX + 1 + i;
+    const sy = mugY - 2 - Math.floor(Math.sin(t * 1.5 + i * 2) * 1.5);
+    const alpha = 0.3 + Math.sin(t + i) * 0.2;
+    ctx.fillStyle = `rgba(200,200,200,${alpha})`;
+    ctx.fillRect(sx * PX, sy * PX, PX, PX);
+  }
+
+  // Small plant (far right)
+  const plantX = mugX + 12;
+  const plantY = deskY - 3;
+  pr(plantX, plantY, 4, 3, '#8B4513'); // pot
+  pr(plantX + 1, plantY - 2, 2, 2, '#27ae60'); // leaves
+  pr(plantX, plantY - 3, 1, 1, '#2ecc71');
+  pr(plantX + 3, plantY - 3, 1, 1, '#2ecc71');
+  pr(plantX + 1, plantY - 4, 2, 1, '#2ecc71');
+
+  // Keyboard
+  const kbX = monX + 2;
+  const kbY = deskY + 2;
+  pr(kbX, kbY, 26, 5, '#444');
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 11; c++) {
+      pr(kbX + 1 + c * 2.2, kbY + 1 + r * 1.4, 1.5, 0.8, '#555');
+    }
+  }
+
+  // MOUSE (the animal, sitting on desk, right of keyboard)
+  const mx = kbX + 28;
+  const my = deskY - 5;
+  drawMouse(mx, my, t);
+
+  // Books (stacked, far left)
+  const bkX = 8;
+  pr(bkX, deskY - 6, 8, 2, '#e74c3c');
+  pr(bkX, deskY - 4, 8, 2, '#3498db');
+  pr(bkX, deskY - 2, 8, 2, '#2ecc71');
+
+  // Notebook + pen
+  pr(bkX, deskY + 1, 7, 5, '#fff');
+  pr(bkX + 1, deskY + 2, 5, 0.5, '#ccc');
+  pr(bkX + 1, deskY + 3, 4, 0.5, '#ccc');
+  pr(bkX + 8, deskY + 1, 1, 6, '#e74c3c'); // pen
+
+  // Rain
+  if (raining) {
+    // Window rain
+    for (let i = 0; i < 15; i++) {
+      const rx = winX + (frame * 0.7 + i * 3.7) % winW;
+      const ry = winY + (frame * 1.2 + i * 5.3) % winH;
+      pr(rx, ry, 0.5, 1.5, 'rgba(180,210,255,0.5)');
+    }
+    // rain on window sill
+    if (frame % 20 < 10) {
+      for (let i = 0; i < 5; i++) {
+        pr(winX + i * 8 + 2, winY + winH, 1, 1, 'rgba(150,190,255,0.3)');
+      }
+    }
+  }
+
+  // Ambient particles (dust motes in light)
+  for (let i = 0; i < 6; i++) {
+    const dx = (Math.sin(t * 0.3 + i * 1.2) * 0.5 + 0.5) * pw;
+    const dy = (Math.cos(t * 0.2 + i * 0.9) * 0.5 + 0.5) * (deskY - 10);
+    const a = Math.sin(t + i * 0.7) * 0.3 + 0.3;
+    ctx.fillStyle = `rgba(255,240,200,${a * 0.15})`;
+    ctx.fillRect(dx * PX, dy * PX, PX, PX);
+  }
+}
+
+function drawMouse(x, y, t) {
+  // Body
+  pr(x, y + 1, 5, 3, '#b0a090');
+  pr(x + 1, y, 3, 1, '#b0a090');
+  // Ears
+  pr(x, y - 1, 2, 2, '#c4a882');
+  pr(x + 3, y - 1, 2, 2, '#c4a882');
+  pr(x + 0.5, y - 0.5, 1, 1, '#e8c4a8');
+  pr(x + 3.5, y - 0.5, 1, 1, '#e8c4a8');
+  // Eyes — blink every few seconds
+  const blink = Math.sin(t * 0.8) > 0.95;
+  if (!blink) {
+    pr(x + 1, y + 1, 1, 1, '#222');
+    pr(x + 3, y + 1, 1, 1, '#222');
+  }
+  // Nose
+  pr(x + 2, y + 2, 1, 1, '#e8a0a0');
+  // Tail
+  const tailWag = Math.sin(t * 2) * 1;
+  pr(x + 5, y + 2, 2, 0.5, '#a09080');
+  pr(x + 7, y + 2 + tailWag * 0.3, 1.5, 0.5, '#a09080');
+  // Breathing animation
+  const breathe = Math.sin(t * 1.5) * 0.3;
+  pr(x + 1, y + 3 + breathe, 3, 0.5, '#b0a090');
+}
+
+// Lo-fi music using Web Audio API
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  gainNode = audioCtx.createGain();
+  gainNode.gain.value = 0;
+  gainNode.connect(audioCtx.destination);
+}
+
+function playLofi() {
+  if (!audioCtx) initAudio();
+
+  // Simple chord progression with soft tones
+  const chords = [
+    [261.6, 329.6, 392.0], // C
+    [220.0, 277.2, 329.6], // Am
+    [246.9, 311.1, 370.0], // F-ish
+    [196.0, 246.9, 293.7], // G
+  ];
+
+  let time = audioCtx.currentTime;
+  const dur = 2.0;
+
+  function scheduleChords() {
+    if (!musicOn) return;
+    let t = audioCtx.currentTime;
+
+    for (let ci = 0; ci < chords.length; ci++) {
+      const chord = chords[ci];
+      for (const freq of chord) {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq * 0.5; // lower octave
+        g.gain.setValueAtTime(0, t + ci * dur);
+        g.gain.linearRampToValueAtTime(0.03, t + ci * dur + 0.3);
+        g.gain.linearRampToValueAtTime(0.02, t + ci * dur + dur * 0.7);
+        g.gain.linearRampToValueAtTime(0, t + ci * dur + dur);
+        osc.connect(g);
+        g.connect(audioCtx.destination);
+        osc.start(t + ci * dur);
+        osc.stop(t + ci * dur + dur);
+      }
+    }
+    setTimeout(scheduleChords, chords.length * dur * 1000 - 100);
+  }
+
+  scheduleChords();
+}
+
+// UI Controls
+function toggleTime(mode) {
+  timeMode = mode;
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+function toggleRain() {
+  raining = !raining;
+  event.target.classList.toggle('active');
+}
+
+function toggleMusic() {
+  musicOn = !musicOn;
+  event.target.classList.toggle('active');
+  if (musicOn) playLofi();
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2, '0');
+  const m = now.getMinutes().toString().padStart(2, '0');
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  document.getElementById('clock').innerHTML = `${h}:${m}<br><span style="font-size:11px">${days[now.getDay()]}</span>`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Animation loop
+function loop() {
+  frame++;
+  drawScene();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

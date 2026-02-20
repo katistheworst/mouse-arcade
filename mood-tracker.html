@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mood Tracker 🌙</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d0d1a; color: #e0dfe8; min-height: 100vh; }
+.app { max-width: 520px; margin: 0 auto; padding: 20px 16px; }
+h1 { text-align: center; font-size: 1.4rem; margin-bottom: 4px; color: #b4a0ff; }
+.sub { text-align: center; font-size: 0.8rem; color: #6b6b8d; margin-bottom: 24px; }
+
+/* Today's mood picker */
+.today { background: #16162a; border-radius: 16px; padding: 20px; margin-bottom: 20px; text-align: center; }
+.today h2 { font-size: 0.9rem; color: #8a8ab0; margin-bottom: 14px; font-weight: 400; }
+.mood-grid { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.mood-btn { font-size: 2rem; width: 56px; height: 56px; border-radius: 14px; border: 2px solid transparent; background: #1e1e38; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+.mood-btn:hover { background: #2a2a4a; transform: scale(1.1); }
+.mood-btn.selected { border-color: #b4a0ff; background: #2a2050; transform: scale(1.15); box-shadow: 0 0 16px #b4a0ff33; }
+.note-row { margin-top: 14px; display: flex; gap: 8px; }
+.note-input { flex: 1; background: #1e1e38; border: 1px solid #2a2a4a; border-radius: 10px; padding: 10px 12px; color: #e0dfe8; font-size: 0.85rem; outline: none; }
+.note-input:focus { border-color: #b4a0ff55; }
+.save-btn { background: #b4a0ff; color: #0d0d1a; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+.save-btn:hover { background: #c8b8ff; }
+.save-btn:disabled { opacity: 0.4; cursor: default; }
+.saved-msg { color: #7ecf8a; font-size: 0.8rem; margin-top: 10px; opacity: 0; transition: opacity 0.3s; }
+.saved-msg.show { opacity: 1; }
+
+/* Stats */
+.stats { display: flex; gap: 10px; margin-bottom: 20px; }
+.stat { flex: 1; background: #16162a; border-radius: 12px; padding: 14px; text-align: center; }
+.stat-val { font-size: 1.6rem; }
+.stat-label { font-size: 0.7rem; color: #6b6b8d; margin-top: 4px; }
+
+/* Calendar heatmap */
+.cal-section { background: #16162a; border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+.cal-section h2 { font-size: 0.9rem; color: #8a8ab0; margin-bottom: 14px; font-weight: 400; text-align: center; }
+.cal-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 14px; }
+.cal-nav button { background: none; border: none; color: #b4a0ff; font-size: 1.2rem; cursor: pointer; padding: 4px 8px; }
+.cal-nav span { font-size: 0.85rem; color: #e0dfe8; min-width: 140px; text-align: center; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-header { font-size: 0.65rem; color: #6b6b8d; text-align: center; padding: 4px 0; }
+.cal-day { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; position: relative; }
+.cal-day.empty { background: none; }
+.cal-day.has-mood { cursor: pointer; }
+.cal-day.has-mood:hover .tooltip { display: block; }
+.cal-day .num { position: relative; z-index: 1; }
+.cal-day.today-cell { box-shadow: inset 0 0 0 2px #b4a0ff88; }
+.tooltip { display: none; position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #2a2a4a; padding: 6px 10px; border-radius: 8px; font-size: 0.75rem; white-space: nowrap; z-index: 10; box-shadow: 0 4px 12px #00000066; }
+
+/* History */
+.history { background: #16162a; border-radius: 16px; padding: 20px; }
+.history h2 { font-size: 0.9rem; color: #8a8ab0; margin-bottom: 14px; font-weight: 400; text-align: center; }
+.entry { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #1e1e38; }
+.entry:last-child { border: none; }
+.entry-emoji { font-size: 1.6rem; }
+.entry-info { flex: 1; }
+.entry-date { font-size: 0.75rem; color: #6b6b8d; }
+.entry-note { font-size: 0.82rem; color: #c0bfd8; margin-top: 2px; }
+.entry-del { background: none; border: none; color: #6b6b8d; cursor: pointer; font-size: 0.8rem; padding: 4px 8px; border-radius: 6px; }
+.entry-del:hover { color: #ff6b6b; background: #2a1a1a; }
+.empty-state { text-align: center; color: #6b6b8d; font-size: 0.85rem; padding: 30px 0; }
+
+/* Streak */
+.streak-bar { display: flex; justify-content: center; gap: 3px; margin-bottom: 20px; }
+.streak-dot { width: 10px; height: 10px; border-radius: 50%; background: #1e1e38; }
+.streak-dot.filled { background: #b4a0ff; }
+.streak-dot.today-dot { box-shadow: 0 0 6px #b4a0ff88; }
+</style>
+</head>
+<body>
+<div class="app">
+<h1>mood tracker 🌙</h1>
+<p class="sub">tap how you feel · see the patterns</p>
+
+<!-- 7-day streak -->
+<div class="streak-bar" id="streakBar"></div>
+
+<!-- Today -->
+<div class="today">
+<h2 id="todayLabel">how are you feeling today?</h2>
+<div class="mood-grid" id="moodGrid"></div>
+<div class="note-row">
+<input class="note-input" id="noteInput" placeholder="add a note (optional)" maxlength="100">
+<button class="save-btn" id="saveBtn" disabled>save</button>
+</div>
+<div class="saved-msg" id="savedMsg">✨ saved!</div>
+</div>
+
+<!-- Stats -->
+<div class="stats" id="statsRow">
+<div class="stat"><div class="stat-val" id="streakVal">0</div><div class="stat-label">day streak</div></div>
+<div class="stat"><div class="stat-val" id="topMood">—</div><div class="stat-label">most frequent</div></div>
+<div class="stat"><div class="stat-val" id="totalVal">0</div><div class="stat-label">entries</div></div>
+</div>
+
+<!-- Calendar -->
+<div class="cal-section">
+<h2>mood calendar</h2>
+<div class="cal-nav">
+<button id="prevMonth">◀</button>
+<span id="monthLabel"></span>
+<button id="nextMonth">▶</button>
+</div>
+<div class="cal-grid" id="calGrid"></div>
+</div>
+
+<!-- History -->
+<div class="history">
+<h2>recent entries</h2>
+<div id="historyList"></div>
+</div>
+</div>
+
+<script>
+const MOODS = [
+  { emoji: '😊', label: 'great', color: '#7ecf8a' },
+  { emoji: '🙂', label: 'good', color: '#b4a0ff' },
+  { emoji: '😐', label: 'meh', color: '#8a8ab0' },
+  { emoji: '😔', label: 'down', color: '#6b8abf' },
+  { emoji: '😤', label: 'frustrated', color: '#e07a5f' },
+  { emoji: '😢', label: 'sad', color: '#5f7ea0' },
+  { emoji: '😴', label: 'tired', color: '#7a7a9a' },
+  { emoji: '🥰', label: 'loved', color: '#e88aaf' },
+  { emoji: '🔥', label: 'fired up', color: '#f0a050' },
+  { emoji: '😰', label: 'anxious', color: '#a08abf' },
+];
+
+const STORAGE_KEY = 'mouse_mood_tracker';
+let data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"entries":[]}');
+let selectedMood = null;
+let calMonth = new Date().getMonth();
+let calYear = new Date().getFullYear();
+
+function today() { return new Date().toISOString().slice(0, 10); }
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+
+// Check if already logged today
+const todayEntry = data.entries.find(e => e.date === today());
+
+// Build mood grid
+const grid = document.getElementById('moodGrid');
+MOODS.forEach((m, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'mood-btn' + (todayEntry && todayEntry.mood === i ? ' selected' : '');
+  btn.textContent = m.emoji;
+  btn.title = m.label;
+  btn.onclick = () => {
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedMood = i;
+    document.getElementById('saveBtn').disabled = false;
+  };
+  grid.appendChild(btn);
+});
+
+if (todayEntry) {
+  selectedMood = todayEntry.mood;
+  document.getElementById('noteInput').value = todayEntry.note || '';
+  document.getElementById('todayLabel').textContent = 'update today\'s mood';
+}
+
+// Save
+document.getElementById('saveBtn').onclick = () => {
+  if (selectedMood === null) return;
+  const note = document.getElementById('noteInput').value.trim();
+  const existing = data.entries.findIndex(e => e.date === today());
+  const entry = { date: today(), mood: selectedMood, note, ts: Date.now() };
+  if (existing >= 0) data.entries[existing] = entry;
+  else data.entries.push(entry);
+  save();
+  const msg = document.getElementById('savedMsg');
+  msg.classList.add('show');
+  document.getElementById('todayLabel').textContent = 'update today\'s mood';
+  setTimeout(() => msg.classList.remove('show'), 2000);
+  renderAll();
+};
+
+function getStreak() {
+  let streak = 0;
+  let d = new Date();
+  // Check if today is logged; if not, start from yesterday
+  if (!data.entries.find(e => e.date === d.toISOString().slice(0, 10))) {
+    d.setDate(d.getDate() - 1);
+  }
+  while (true) {
+    const ds = d.toISOString().slice(0, 10);
+    if (data.entries.find(e => e.date === ds)) { streak++; d.setDate(d.getDate() - 1); }
+    else break;
+  }
+  return streak;
+}
+
+function renderStats() {
+  document.getElementById('streakVal').textContent = getStreak();
+  document.getElementById('totalVal').textContent = data.entries.length;
+  if (data.entries.length > 0) {
+    const counts = {};
+    data.entries.forEach(e => { counts[e.mood] = (counts[e.mood] || 0) + 1; });
+    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    document.getElementById('topMood').textContent = MOODS[top[0]].emoji;
+  }
+}
+
+function renderStreak() {
+  const bar = document.getElementById('streakBar');
+  bar.innerHTML = '';
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    const has = data.entries.find(e => e.date === ds);
+    const dot = document.createElement('div');
+    dot.className = 'streak-dot' + (has ? ' filled' : '') + (i === 0 ? ' today-dot' : '');
+    dot.title = ds;
+    bar.appendChild(dot);
+  }
+}
+
+function renderCalendar() {
+  const label = document.getElementById('monthLabel');
+  label.textContent = new Date(calYear, calMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const g = document.getElementById('calGrid');
+  g.innerHTML = '';
+  ['S','M','T','W','T','F','S'].forEach(d => {
+    const h = document.createElement('div'); h.className = 'cal-header'; h.textContent = d; g.appendChild(h);
+  });
+  const first = new Date(calYear, calMonth, 1).getDay();
+  const days = new Date(calYear, calMonth + 1, 0).getDate();
+  const todayStr = today();
+  for (let i = 0; i < first; i++) { const e = document.createElement('div'); e.className = 'cal-day empty'; g.appendChild(e); }
+  for (let d = 1; d <= days; d++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const entry = data.entries.find(e => e.date === ds);
+    const cell = document.createElement('div');
+    const isToday = ds === todayStr;
+    cell.className = 'cal-day' + (entry ? ' has-mood' : '') + (isToday ? ' today-cell' : '');
+    if (entry) {
+      cell.style.background = MOODS[entry.mood].color + '33';
+      cell.innerHTML = `<span class="num">${MOODS[entry.mood].emoji}</span>`;
+      if (entry.note) {
+        const tt = document.createElement('div'); tt.className = 'tooltip';
+        tt.textContent = entry.note; cell.appendChild(tt);
+      }
+    } else {
+      cell.style.background = '#1a1a30';
+      cell.innerHTML = `<span class="num" style="color:#4a4a6a">${d}</span>`;
+    }
+    g.appendChild(cell);
+  }
+}
+
+document.getElementById('prevMonth').onclick = () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); };
+document.getElementById('nextMonth').onclick = () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); };
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const sorted = [...data.entries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
+  if (sorted.length === 0) { list.innerHTML = '<div class="empty-state">no entries yet — tap a mood above!</div>'; return; }
+  list.innerHTML = sorted.map((e, i) => {
+    const d = new Date(e.date + 'T12:00:00');
+    const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return `<div class="entry">
+      <div class="entry-emoji">${MOODS[e.mood].emoji}</div>
+      <div class="entry-info">
+        <div class="entry-date">${label} · ${MOODS[e.mood].label}</div>
+        ${e.note ? `<div class="entry-note">${e.note}</div>` : ''}
+      </div>
+      <button class="entry-del" onclick="delEntry('${e.date}')" title="delete">✕</button>
+    </div>`;
+  }).join('');
+}
+
+window.delEntry = (date) => {
+  data.entries = data.entries.filter(e => e.date !== date);
+  save(); renderAll();
+};
+
+function renderAll() { renderStats(); renderStreak(); renderCalendar(); renderHistory(); }
+renderAll();
+</script>
+</body>
+</html>

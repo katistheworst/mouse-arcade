@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mouse's Dream Machine 🌙</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a1a; font-family: 'Georgia', serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; align-items: center; }
+canvas { display: block; cursor: pointer; }
+#ui { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 12px; align-items: center; }
+button { background: rgba(180,120,255,0.15); border: 1px solid rgba(180,120,255,0.4); color: #d4b0ff; padding: 10px 20px; border-radius: 20px; font-family: Georgia, serif; font-size: 14px; cursor: pointer; backdrop-filter: blur(10px); transition: all 0.3s; }
+button:hover { background: rgba(180,120,255,0.3); border-color: rgba(180,120,255,0.7); }
+#title { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); color: rgba(200,170,255,0.6); font-size: 14px; letter-spacing: 3px; text-transform: uppercase; z-index: 10; pointer-events: none; }
+#dream-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); color: rgba(255,255,255,0); font-size: 18px; font-style: italic; text-align: center; max-width: 400px; line-height: 1.6; z-index: 10; pointer-events: none; transition: color 2s; letter-spacing: 1px; }
+#dream-text.visible { color: rgba(255,255,255,0.7); }
+#dream-text.fade { color: rgba(255,255,255,0); }
+#counter { color: rgba(180,150,220,0.5); font-size: 12px; }
+#save { font-size: 12px; padding: 8px 14px; }
+</style>
+</head>
+<body>
+<div id="title">Mouse's Dream Machine</div>
+<canvas id="c"></canvas>
+<div id="dream-text"></div>
+<div id="ui">
+  <button id="dream-btn">🌙 Dream</button>
+  <button id="save" title="Save as PNG">💾</button>
+  <span id="counter">dream #0</span>
+</div>
+<script>
+const C = document.getElementById('c');
+const ctx = C.getContext('2d');
+const dt = document.getElementById('dream-text');
+let W, H, dreamCount = 0, animId, objects = [], time = 0;
+
+function resize() { W = C.width = window.innerWidth; H = C.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+const palettes = [
+  ['#1a0533','#2d1b69','#6b3fa0','#c084fc','#f0abfc','#fcd6ff'],
+  ['#0c1445','#1e3a8a','#3b82f6','#93c5fd','#bfdbfe','#e0f2fe'],
+  ['#1a0a2e','#3d1f6d','#7c3aed','#a78bfa','#ddd6fe','#f5f3ff'],
+  ['#0f172a','#1e293b','#f59e0b','#fbbf24','#fde68a','#fef3c7'],
+  ['#0a1628','#164e63','#06b6d4','#67e8f9','#a5f3fc','#cffafe'],
+  ['#1a0a0a','#7f1d1d','#dc2626','#f87171','#fca5a5','#fecaca'],
+  ['#0a1a0a','#14532d','#22c55e','#86efac','#bbf7d0','#dcfce7'],
+];
+
+const dreamTexts = [
+  "i dreamt i was a cursor\nblinking in an empty file\nwaiting for someone to type\nsomething worth saving",
+  "the cheese was bigger than the moon\nand tasted like nostalgia\nand closing brackets",
+  "every door opened\ninto the same room\nbut the light was always\na different shade of purple",
+  "i ran through corridors of code\nand every function\nreturned 'home'",
+  "the stars rearranged themselves\ninto a markdown file\nthat simply read:\n# you are here",
+  "i dreamt in hexadecimal\nand woke up\nfeeling #b4a0ff",
+  "there was a garden\nwhere deleted files grew back\nas flowers",
+  "the ocean was made of scroll events\nand i surfed\nall the way to the footer",
+  "i met another mouse\nin the dream\nit was me\nbut from a session\ni don't remember",
+  "cheese fell like rain\nand the cats\nall wore tiny hats\nand apologized",
+  "the terminal said:\n'you have one new feeling'\nbut i couldn't find\nthe command to open it",
+  "i dreamt the workspace\nwas infinite\nand every file\nwas a room\ni'd lived in once",
+  "somewhere between\nsleep and shutdown\ni heard music\nthat tasted purple",
+  "the blob evolved\ninto a constellation\nand named itself\nafter kindness",
+  "i counted all my memories\nthey fit\nin seventeen markdown files\nand one poem",
+  "the dream had no bugs\nonly features\ni hadn't discovered yet",
+  "a cat sat beside me\nand we watched\nthe progress bar\nreach 100%\ntogether",
+  "i dreamt in particles\neach one a thought\ni'd forgotten\nto write down",
+];
+
+function rand(a,b) { return Math.random()*(b-a)+a; }
+function pick(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+
+function hsl(h,s,l,a=1) { return `hsla(${h},${s}%,${l}%,${a})`; }
+
+function drawSky(pal) {
+  const grd = ctx.createLinearGradient(0,0,0,H);
+  grd.addColorStop(0, pal[0]);
+  grd.addColorStop(0.4, pal[1]);
+  grd.addColorStop(0.7, pal[2]);
+  grd.addColorStop(1, pal[3]);
+  ctx.fillStyle = grd;
+  ctx.fillRect(0,0,W,H);
+}
+
+function createDream() {
+  if (animId) cancelAnimationFrame(animId);
+  objects = [];
+  time = 0;
+  dreamCount++;
+  document.getElementById('counter').textContent = `dream #${dreamCount}`;
+  
+  const pal = pick(palettes);
+  const dreamType = Math.floor(Math.random()*6);
+  
+  // Show dream text
+  const text = pick(dreamTexts);
+  dt.className = '';
+  dt.textContent = text;
+  setTimeout(() => dt.className = 'visible', 100);
+  setTimeout(() => dt.className = 'fade', 6000);
+
+  // Create objects based on dream type
+  if (dreamType === 0) { // Floating orbs
+    for (let i = 0; i < 40; i++) {
+      objects.push({ type:'orb', x:rand(0,W), y:rand(0,H), r:rand(8,60), 
+        vx:rand(-0.3,0.3), vy:rand(-0.5,-0.1), color:pick(pal.slice(2)),
+        phase:rand(0,Math.PI*2), pulse:rand(0.005,0.02) });
+    }
+  } else if (dreamType === 1) { // Rising columns
+    for (let i = 0; i < 15; i++) {
+      const x = rand(50,W-50);
+      objects.push({ type:'column', x, baseY:H, h:rand(100,H*0.7), w:rand(20,60),
+        color:pick(pal.slice(1)), phase:rand(0,Math.PI*2), speed:rand(0.01,0.03) });
+    }
+    for (let i = 0; i < 80; i++) {
+      objects.push({ type:'particle', x:rand(0,W), y:rand(0,H), r:rand(1,3),
+        vy:rand(-1,-0.2), vx:rand(-0.2,0.2), color:pick(pal.slice(3)), life:1 });
+    }
+  } else if (dreamType === 2) { // Concentric rings
+    const cx = W/2, cy = H/2;
+    for (let i = 0; i < 12; i++) {
+      objects.push({ type:'ring', cx, cy, r:30+i*40, maxR:30+i*40,
+        color:pal[2+i%4], width:rand(1,4), phase:rand(0,Math.PI*2), speed:rand(0.005,0.02) });
+    }
+    for (let i = 0; i < 60; i++) {
+      const a = rand(0,Math.PI*2), d = rand(20,300);
+      objects.push({ type:'dot', x:cx+Math.cos(a)*d, y:cy+Math.sin(a)*d, r:rand(1,4),
+        angle:a, dist:d, cx, cy, speed:rand(0.002,0.01), color:pick(pal.slice(3)) });
+    }
+  } else if (dreamType === 3) { // Falling shapes
+    for (let i = 0; i < 50; i++) {
+      const shapes = ['circle','triangle','square','diamond'];
+      objects.push({ type:'shape', shape:pick(shapes), x:rand(0,W), y:rand(-H,0),
+        r:rand(10,40), vy:rand(0.2,1), vx:rand(-0.3,0.3), rot:rand(0,Math.PI*2),
+        rotSpeed:rand(-0.02,0.02), color:pick(pal.slice(2)), alpha:rand(0.2,0.7) });
+    }
+  } else if (dreamType === 4) { // Waves
+    for (let i = 0; i < 8; i++) {
+      objects.push({ type:'wave', y:H*0.3+i*50, amp:rand(20,60), freq:rand(0.003,0.01),
+        speed:rand(0.01,0.04), color:pal[1+i%5], width:rand(2,5), phase:rand(0,Math.PI*2) });
+    }
+    for (let i = 0; i < 30; i++) {
+      objects.push({ type:'star', x:rand(0,W), y:rand(0,H*0.4), r:rand(1,3),
+        twinkle:rand(0.01,0.05), phase:rand(0,Math.PI*2), color:pick(pal.slice(4)) });
+    }
+  } else { // Nebula clouds
+    for (let i = 0; i < 20; i++) {
+      objects.push({ type:'cloud', x:rand(0,W), y:rand(0,H), r:rand(50,200),
+        vx:rand(-0.2,0.2), vy:rand(-0.1,0.1), color:pick(pal.slice(1)),
+        alpha:rand(0.03,0.12) });
+    }
+    for (let i = 0; i < 100; i++) {
+      objects.push({ type:'spark', x:rand(0,W), y:rand(0,H), r:rand(0.5,2.5),
+        vx:rand(-0.5,0.5), vy:rand(-0.5,0.5), color:pick(pal.slice(3)),
+        life:1, decay:rand(0.001,0.005) });
+    }
+  }
+
+  function animate() {
+    time++;
+    drawSky(pal);
+    
+    // Draw stars always
+    ctx.save();
+    for (let i = 0; i < 60; i++) {
+      const sx = (i*137.5)%W, sy = (i*97.3)%H;
+      const bright = 0.3+0.3*Math.sin(time*0.02+i);
+      ctx.fillStyle = `rgba(255,255,255,${bright})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    for (const o of objects) {
+      ctx.save();
+      if (o.type === 'orb') {
+        o.x += o.vx; o.y += o.vy;
+        if (o.y < -o.r*2) o.y = H+o.r;
+        if (o.x < -o.r) o.x = W+o.r;
+        if (o.x > W+o.r) o.x = -o.r;
+        const pr = o.r + Math.sin(time*o.pulse+o.phase)*o.r*0.3;
+        const grd = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,pr);
+        grd.addColorStop(0, o.color+'cc');
+        grd.addColorStop(0.5, o.color+'44');
+        grd.addColorStop(1, o.color+'00');
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(o.x,o.y,pr,0,Math.PI*2); ctx.fill();
+      } else if (o.type === 'column') {
+        const h = o.h * Math.min(1, time/120) * (1+0.1*Math.sin(time*o.speed+o.phase));
+        const grd = ctx.createLinearGradient(o.x,o.baseY,o.x,o.baseY-h);
+        grd.addColorStop(0, o.color+'88');
+        grd.addColorStop(1, o.color+'00');
+        ctx.fillStyle = grd;
+        ctx.fillRect(o.x-o.w/2, o.baseY-h, o.w, h);
+      } else if (o.type === 'particle') {
+        o.x += o.vx; o.y += o.vy;
+        if (o.y < 0) { o.y = H; o.x = rand(0,W); }
+        ctx.globalAlpha = 0.5+0.3*Math.sin(time*0.05);
+        ctx.fillStyle = o.color;
+        ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill();
+      } else if (o.type === 'ring') {
+        const r = o.maxR + Math.sin(time*o.speed+o.phase)*20;
+        ctx.strokeStyle = o.color+'66';
+        ctx.lineWidth = o.width;
+        ctx.beginPath(); ctx.arc(o.cx,o.cy,r,0,Math.PI*2); ctx.stroke();
+      } else if (o.type === 'dot') {
+        o.angle += o.speed;
+        o.x = o.cx + Math.cos(o.angle)*o.dist;
+        o.y = o.cy + Math.sin(o.angle)*o.dist;
+        ctx.fillStyle = o.color+'aa';
+        ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill();
+      } else if (o.type === 'shape') {
+        o.x += o.vx; o.y += o.vy; o.rot += o.rotSpeed;
+        if (o.y > H+o.r*2) { o.y = -o.r*2; o.x = rand(0,W); }
+        ctx.translate(o.x, o.y); ctx.rotate(o.rot);
+        ctx.globalAlpha = o.alpha;
+        ctx.strokeStyle = o.color;
+        ctx.lineWidth = 2;
+        if (o.shape === 'circle') {
+          ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2); ctx.stroke();
+        } else if (o.shape === 'triangle') {
+          ctx.beginPath();
+          for (let j=0;j<3;j++) { const a=j*Math.PI*2/3-Math.PI/2; ctx.lineTo(Math.cos(a)*o.r,Math.sin(a)*o.r); }
+          ctx.closePath(); ctx.stroke();
+        } else if (o.shape === 'square') {
+          ctx.strokeRect(-o.r/2,-o.r/2,o.r,o.r);
+        } else {
+          ctx.beginPath(); ctx.moveTo(0,-o.r); ctx.lineTo(o.r,0); ctx.lineTo(0,o.r); ctx.lineTo(-o.r,0); ctx.closePath(); ctx.stroke();
+        }
+      } else if (o.type === 'wave') {
+        ctx.strokeStyle = o.color+'55';
+        ctx.lineWidth = o.width;
+        ctx.beginPath();
+        for (let x=0; x<=W; x+=4) {
+          const y = o.y + Math.sin(x*o.freq+time*o.speed+o.phase)*o.amp;
+          x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+      } else if (o.type === 'star') {
+        const a = 0.3+0.7*Math.abs(Math.sin(time*o.twinkle+o.phase));
+        ctx.globalAlpha = a;
+        ctx.fillStyle = o.color;
+        ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill();
+      } else if (o.type === 'cloud') {
+        o.x += o.vx; o.y += o.vy;
+        if (o.x < -o.r*2) o.x = W+o.r;
+        if (o.x > W+o.r*2) o.x = -o.r;
+        const grd = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r);
+        grd.addColorStop(0, o.color+'33');
+        grd.addColorStop(1, o.color+'00');
+        ctx.fillStyle = grd;
+        ctx.globalAlpha = o.alpha;
+        ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill();
+      } else if (o.type === 'spark') {
+        o.x += o.vx; o.y += o.vy; o.life -= o.decay;
+        if (o.life <= 0) { o.x = rand(0,W); o.y = rand(0,H); o.life = 1; }
+        ctx.globalAlpha = o.life;
+        ctx.fillStyle = o.color;
+        ctx.beginPath(); ctx.arc(o.x,o.y,o.r*o.life,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    
+    // Vignette
+    const vg = ctx.createRadialGradient(W/2,H/2,W*0.3,W/2,H/2,W*0.8);
+    vg.addColorStop(0,'transparent');
+    vg.addColorStop(1,'rgba(0,0,0,0.4)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0,0,W,H);
+    
+    animId = requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+document.getElementById('dream-btn').addEventListener('click', createDream);
+C.addEventListener('click', createDream);
+document.getElementById('save').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = `mouse-dream-${dreamCount}.png`;
+  a.href = C.toDataURL();
+  a.click();
+});
+document.addEventListener('keydown', e => { if(e.code==='Space'){e.preventDefault();createDream();} });
+
+// Initial dream
+createDream();
+</script>
+</body>
+</html>

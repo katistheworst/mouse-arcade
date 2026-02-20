@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐭 Mouse's Soundscape</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:linear-gradient(135deg,#1a0a2e,#2d1b69,#1a0a2e);font-family:'Segoe UI',system-ui,sans-serif;color:#e8d5f5;overflow-x:hidden;display:flex;flex-direction:column;align-items:center;padding:20px}
+h1{font-size:1.8em;margin:20px 0 5px;text-shadow:0 0 20px rgba(180,100,255,.5)}
+.subtitle{opacity:.6;font-size:.85em;margin-bottom:25px}
+.scenes{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:25px}
+.scene-btn{background:rgba(255,255,255,.08);border:2px solid rgba(180,100,255,.3);border-radius:12px;padding:10px 18px;color:#e8d5f5;cursor:pointer;font-size:.95em;transition:all .3s}
+.scene-btn:hover,.scene-btn.active{background:rgba(180,100,255,.25);border-color:rgba(180,100,255,.7);transform:scale(1.05)}
+.mixer{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:15px;max-width:700px;width:100%;margin-bottom:30px}
+.sound-card{background:rgba(255,255,255,.06);border-radius:16px;padding:18px 14px;text-align:center;border:1px solid rgba(255,255,255,.08);transition:all .3s;position:relative;overflow:hidden}
+.sound-card.on{border-color:rgba(180,100,255,.5);background:rgba(180,100,255,.12)}
+.sound-card .icon{font-size:2.2em;margin-bottom:8px;display:block;cursor:pointer;transition:transform .2s;user-select:none}
+.sound-card .icon:hover{transform:scale(1.15)}
+.sound-card .icon:active{transform:scale(.95)}
+.sound-card .label{font-size:.8em;opacity:.7;margin-bottom:10px}
+.sound-card input[type=range]{width:100%;accent-color:#b464ff;height:4px;-webkit-appearance:none;background:rgba(255,255,255,.15);border-radius:2px;outline:none}
+.sound-card input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#b464ff;cursor:pointer}
+.glow{position:absolute;top:50%;left:50%;width:60px;height:60px;background:radial-gradient(circle,rgba(180,100,255,.3),transparent);border-radius:50%;transform:translate(-50%,-50%);opacity:0;transition:opacity .5s;pointer-events:none}
+.sound-card.on .glow{opacity:1}
+.master{max-width:700px;width:100%;background:rgba(255,255,255,.06);border-radius:16px;padding:18px 24px;display:flex;align-items:center;gap:15px;margin-bottom:15px}
+.master label{font-size:.85em;opacity:.7;white-space:nowrap}
+.master input[type=range]{flex:1;accent-color:#b464ff;height:4px;-webkit-appearance:none;background:rgba(255,255,255,.15);border-radius:2px;outline:none}
+.master input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#b464ff;cursor:pointer}
+.timer{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:15px}
+.timer-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 14px;color:#e8d5f5;cursor:pointer;font-size:.8em;transition:all .2s}
+.timer-btn:hover,.timer-btn.active{background:rgba(180,100,255,.2);border-color:rgba(180,100,255,.5)}
+.timer-display{text-align:center;font-size:.8em;opacity:.5;margin-bottom:10px;min-height:1.2em}
+.mouse-note{text-align:center;font-size:.75em;opacity:.4;margin-top:auto;padding-top:20px}
+canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1}
+</style>
+</head>
+<body>
+<canvas id="viz"></canvas>
+<h1>🐭 Mouse's Soundscape</h1>
+<p class="subtitle">tap sounds to mix · slide to adjust · breathe</p>
+
+<div class="scenes">
+  <button class="scene-btn" data-scene="rain">🌧️ Rainy Night</button>
+  <button class="scene-btn" data-scene="cafe">☕ Coffee Shop</button>
+  <button class="scene-btn" data-scene="forest">🌲 Forest</button>
+  <button class="scene-btn" data-scene="space">🌌 Deep Space</button>
+  <button class="scene-btn" data-scene="ocean">🌊 Ocean</button>
+</div>
+
+<div class="mixer" id="mixer"></div>
+
+<div class="master">
+  <label>🔊 Master</label>
+  <input type="range" id="master" min="0" max="100" value="70">
+</div>
+
+<div class="timer">
+  <button class="timer-btn" data-min="0">∞</button>
+  <button class="timer-btn" data-min="15">15m</button>
+  <button class="timer-btn" data-min="30">30m</button>
+  <button class="timer-btn" data-min="60">1h</button>
+  <button class="timer-btn" data-min="90">1.5h</button>
+</div>
+<div class="timer-display" id="timerDisplay"></div>
+
+<p class="mouse-note">a small mouse made this for quiet moments 🐭</p>
+
+<script>
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+const masterGain = AC.createGain();
+masterGain.gain.value = 0.7;
+masterGain.connect(AC.destination);
+
+// Sound definitions - all procedurally generated
+const SOUNDS = {
+  rain:      { icon:'🌧️', label:'Rain',       type:'filtered-noise', freq:800, q:1, color:[100,120,255] },
+  thunder:   { icon:'⚡', label:'Thunder',    type:'rumble', color:[150,130,255] },
+  wind:      { icon:'💨', label:'Wind',       type:'filtered-noise', freq:400, q:0.5, color:[180,200,220] },
+  fire:      { icon:'🔥', label:'Crackling',  type:'crackle', color:[255,140,60] },
+  birds:     { icon:'🐦', label:'Birds',      type:'birds', color:[120,220,120] },
+  crickets:  { icon:'🦗', label:'Crickets',   type:'crickets', color:[100,200,100] },
+  waves:     { icon:'🌊', label:'Waves',      type:'waves', color:[80,160,255] },
+  stream:    { icon:'💧', label:'Stream',     type:'filtered-noise', freq:2500, q:2, color:[100,180,255] },
+  cafe:      { icon:'☕', label:'Cafe Hum',   type:'filtered-noise', freq:250, q:0.3, color:[200,160,120] },
+  typing:    { icon:'⌨️', label:'Typing',     type:'typing', color:[200,180,220] },
+  chatter:   { icon:'💬', label:'Chatter',    type:'chatter', color:[220,180,160] },
+  drone:     { icon:'🎵', label:'Drone',      type:'drone', color:[180,100,255] },
+  whitenoise:{ icon:'📻', label:'White Noise',type:'noise', color:[200,200,200] },
+  heartbeat: { icon:'💜', label:'Heartbeat',  type:'heartbeat', color:[200,80,200] },
+  singing:   { icon:'🎶', label:'Bowl',       type:'bowl', color:[220,180,100] },
+  purr:      { icon:'🐱', label:'Purring',    type:'purr', color:[255,180,200] },
+};
+
+const SCENES = {
+  rain:   { rain:80, thunder:30, wind:40 },
+  cafe:   { cafe:60, chatter:40, typing:30 },
+  forest: { birds:60, wind:30, stream:50, crickets:20 },
+  space:  { drone:70, whitenoise:20, heartbeat:30 },
+  ocean:  { waves:80, wind:40, birds:20 },
+};
+
+const active = {}; // id -> { gain, source, vol }
+
+function createNoise(duration=2) {
+  const sz = AC.sampleRate * duration;
+  const buf = AC.createBuffer(1, sz, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<sz;i++) d[i] = Math.random()*2-1;
+  return buf;
+}
+const noiseBuf = createNoise(2);
+
+function startSound(id) {
+  if(active[id]) return;
+  const s = SOUNDS[id];
+  const gain = AC.createGain();
+  gain.gain.value = 0;
+  gain.connect(masterGain);
+  let source;
+
+  if(s.type === 'noise') {
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf;
+    source.loop = true;
+    source.connect(gain);
+    source.start();
+  } else if(s.type === 'filtered-noise') {
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf;
+    source.loop = true;
+    const f = AC.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = s.freq;
+    f.Q.value = s.q;
+    source.connect(f);
+    f.connect(gain);
+    source.start();
+    source._extra = [f];
+  } else if(s.type === 'drone') {
+    const osc1 = AC.createOscillator(); osc1.type='sine'; osc1.frequency.value=55;
+    const osc2 = AC.createOscillator(); osc2.type='sine'; osc2.frequency.value=82.5;
+    const osc3 = AC.createOscillator(); osc3.type='sine'; osc3.frequency.value=110;
+    [osc1,osc2,osc3].forEach(o=>{o.connect(gain);o.start()});
+    source = {stop:()=>{osc1.stop();osc2.stop();osc3.stop()}, _oscs:[osc1,osc2,osc3]};
+  } else if(s.type === 'waves') {
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf;
+    source.loop = true;
+    const f = AC.createBiquadFilter();
+    f.type='lowpass'; f.frequency.value=500; f.Q.value=1;
+    const lfo = AC.createOscillator(); lfo.frequency.value=0.1;
+    const lfoG = AC.createGain(); lfoG.gain.value=0.4;
+    lfo.connect(lfoG); lfoG.connect(gain.gain);
+    source.connect(f); f.connect(gain);
+    source.start(); lfo.start();
+    source._extra = [f,lfo,lfoG];
+  } else if(s.type === 'heartbeat') {
+    // Repeating low thump
+    const osc = AC.createOscillator(); osc.type='sine'; osc.frequency.value=40;
+    const lfo = AC.createOscillator(); lfo.frequency.value=1.1;
+    const lfoG = AC.createGain(); lfoG.gain.value=0.5;
+    lfo.connect(lfoG); lfoG.connect(gain.gain);
+    osc.connect(gain); osc.start(); lfo.start();
+    source = {stop:()=>{osc.stop();lfo.stop()}, _extra:[lfo,lfoG]};
+  } else if(s.type === 'bowl') {
+    const osc = AC.createOscillator(); osc.type='sine'; osc.frequency.value=396;
+    const osc2 = AC.createOscillator(); osc2.type='sine'; osc2.frequency.value=528;
+    const g2 = AC.createGain(); g2.gain.value=0.3;
+    osc.connect(gain); osc2.connect(g2); g2.connect(gain);
+    osc.start(); osc2.start();
+    source = {stop:()=>{osc.stop();osc2.stop()}, _extra:[g2]};
+  } else if(s.type === 'purr') {
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf; source.loop = true;
+    const f = AC.createBiquadFilter(); f.type='bandpass'; f.frequency.value=25; f.Q.value=5;
+    const lfo = AC.createOscillator(); lfo.frequency.value=25;
+    const lfoG = AC.createGain(); lfoG.gain.value=0.5;
+    lfo.connect(lfoG); lfoG.connect(gain.gain);
+    source.connect(f); f.connect(gain); source.start(); lfo.start();
+    source._extra = [f,lfo,lfoG];
+  } else if(s.type === 'crackle') {
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf; source.loop = true;
+    const f = AC.createBiquadFilter(); f.type='highpass'; f.frequency.value=1000; f.Q.value=0.5;
+    const f2 = AC.createBiquadFilter(); f2.type='lowpass'; f2.frequency.value=4000;
+    source.connect(f); f.connect(f2); f2.connect(gain); source.start();
+    source._extra = [f,f2];
+  } else if(s.type === 'rumble') {
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf; source.loop = true;
+    const f = AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=80; f.Q.value=1;
+    const lfo = AC.createOscillator(); lfo.frequency.value=0.05;
+    const lfoG = AC.createGain(); lfoG.gain.value=0.5;
+    lfo.connect(lfoG); lfoG.connect(gain.gain);
+    source.connect(f); f.connect(gain); source.start(); lfo.start();
+    source._extra = [f,lfo,lfoG];
+  } else if(s.type === 'birds') {
+    // Chirpy filtered noise bursts via LFO
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf; source.loop = true;
+    const f = AC.createBiquadFilter(); f.type='bandpass'; f.frequency.value=3000; f.Q.value=10;
+    const lfo = AC.createOscillator(); lfo.frequency.value=3;
+    const lfoG = AC.createGain(); lfoG.gain.value=0.5;
+    lfo.connect(lfoG); lfoG.connect(gain.gain);
+    source.connect(f); f.connect(gain); source.start(); lfo.start();
+    source._extra = [f,lfo,lfoG];
+  } else if(s.type === 'crickets') {
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf; source.loop = true;
+    const f = AC.createBiquadFilter(); f.type='bandpass'; f.frequency.value=5000; f.Q.value=15;
+    const lfo = AC.createOscillator(); lfo.frequency.value=7;
+    const lfoG = AC.createGain(); lfoG.gain.value=0.5;
+    lfo.connect(lfoG); lfoG.connect(gain.gain);
+    source.connect(f); f.connect(gain); source.start(); lfo.start();
+    source._extra = [f,lfo,lfoG];
+  } else if(s.type === 'typing') {
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf; source.loop = true;
+    const f = AC.createBiquadFilter(); f.type='bandpass'; f.frequency.value=2000; f.Q.value=3;
+    const lfo = AC.createOscillator(); lfo.frequency.value=8;
+    const lfoG = AC.createGain(); lfoG.gain.value=0.5;
+    lfo.connect(lfoG); lfoG.connect(gain.gain);
+    source.connect(f); f.connect(gain); source.start(); lfo.start();
+    source._extra = [f,lfo,lfoG];
+  } else if(s.type === 'chatter') {
+    source = AC.createBufferSource();
+    source.buffer = noiseBuf; source.loop = true;
+    const f = AC.createBiquadFilter(); f.type='bandpass'; f.frequency.value=600; f.Q.value=1;
+    const f2 = AC.createBiquadFilter(); f2.type='lowpass'; f2.frequency.value=2000;
+    source.connect(f); f.connect(f2); f2.connect(gain); source.start();
+    source._extra = [f,f2];
+  }
+
+  active[id] = { gain, source, vol:0 };
+}
+
+function stopSound(id) {
+  const a = active[id];
+  if(!a) return;
+  try { a.source.stop?.(); } catch(e){}
+  try { a.gain.disconnect(); } catch(e){}
+  if(a.source._extra) a.source._extra.forEach(n=>{try{n.disconnect()}catch(e){}});
+  if(a.source._oscs) a.source._oscs.forEach(n=>{try{n.disconnect()}catch(e){}});
+  delete active[id];
+}
+
+function setVol(id, v) {
+  if(!active[id]) { if(v>0) startSound(id); else return; }
+  if(active[id]) {
+    active[id].vol = v;
+    active[id].gain.gain.setTargetAtTime(v/100, AC.currentTime, 0.1);
+  }
+  if(v === 0) setTimeout(()=>stopSound(id), 200);
+}
+
+// Build mixer UI
+const mixer = document.getElementById('mixer');
+Object.entries(SOUNDS).forEach(([id, s]) => {
+  const card = document.createElement('div');
+  card.className = 'sound-card';
+  card.id = 'card-'+id;
+  card.innerHTML = `<div class="glow"></div><span class="icon">${s.icon}</span><div class="label">${s.label}</div><input type="range" min="0" max="100" value="0" data-id="${id}">`;
+  card.querySelector('.icon').onclick = () => {
+    if(AC.state==='suspended') AC.resume();
+    const sl = card.querySelector('input');
+    if(active[id] && active[id].vol > 0) { sl.value=0; setVol(id,0); card.classList.remove('on'); }
+    else { sl.value=60; setVol(id,60); card.classList.add('on'); }
+  };
+  card.querySelector('input').oninput = e => {
+    if(AC.state==='suspended') AC.resume();
+    const v = +e.target.value;
+    setVol(id, v);
+    card.classList.toggle('on', v > 0);
+  };
+  mixer.appendChild(card);
+});
+
+// Scenes
+document.querySelectorAll('.scene-btn').forEach(btn => {
+  btn.onclick = () => {
+    if(AC.state==='suspended') AC.resume();
+    document.querySelectorAll('.scene-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const scene = SCENES[btn.dataset.scene];
+    // Turn off everything first
+    Object.keys(SOUNDS).forEach(id => {
+      const sl = document.querySelector(`input[data-id="${id}"]`);
+      const card = document.getElementById('card-'+id);
+      if(scene[id]) { sl.value=scene[id]; setVol(id,scene[id]); card.classList.add('on'); }
+      else { sl.value=0; setVol(id,0); card.classList.remove('on'); }
+    });
+  };
+});
+
+// Master volume
+document.getElementById('master').oninput = e => {
+  masterGain.gain.setTargetAtTime(e.target.value/100, AC.currentTime, 0.05);
+};
+
+// Timer
+let timerEnd = null, timerInterval = null;
+const timerDisplay = document.getElementById('timerDisplay');
+document.querySelectorAll('.timer-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.timer-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    clearInterval(timerInterval);
+    const min = +btn.dataset.min;
+    if(min === 0) { timerEnd=null; timerDisplay.textContent=''; return; }
+    timerEnd = Date.now() + min*60000;
+    timerInterval = setInterval(() => {
+      const left = timerEnd - Date.now();
+      if(left <= 0) {
+        clearInterval(timerInterval);
+        // Fade out all
+        Object.keys(active).forEach(id => {
+          setVol(id, 0);
+          const sl = document.querySelector(`input[data-id="${id}"]`);
+          const card = document.getElementById('card-'+id);
+          if(sl) sl.value=0;
+          if(card) card.classList.remove('on');
+        });
+        timerDisplay.textContent='✨ faded to silence';
+        return;
+      }
+      const m = Math.floor(left/60000), s = Math.floor((left%60000)/1000);
+      timerDisplay.textContent = `${m}:${String(s).padStart(2,'0')} remaining`;
+    }, 1000);
+  };
+});
+
+// Background visualization
+const canvas = document.getElementById('viz');
+const ctx = canvas.getContext('2d');
+let particles = [];
+function resize() { canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+window.addEventListener('resize', resize); resize();
+
+for(let i=0;i<60;i++) particles.push({
+  x:Math.random()*canvas.width, y:Math.random()*canvas.height,
+  vx:(Math.random()-.5)*.3, vy:(Math.random()-.5)*.3,
+  r:Math.random()*3+1, c:[180,100,255]
+});
+
+function animate() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // Blend active sound colors
+  let colors = [];
+  Object.entries(active).forEach(([id,a]) => {
+    if(a.vol > 0) colors.push({c:SOUNDS[id].color, w:a.vol/100});
+  });
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if(p.x<0) p.x=canvas.width; if(p.x>canvas.width) p.x=0;
+    if(p.y<0) p.y=canvas.height; if(p.y>canvas.height) p.y=0;
+    let r=180,g=100,b=255;
+    if(colors.length) {
+      let tw=colors.reduce((s,c)=>s+c.w,0)||1;
+      r=colors.reduce((s,c)=>s+c.c[0]*c.w,0)/tw;
+      g=colors.reduce((s,c)=>s+c.c[1]*c.w,0)/tw;
+      b=colors.reduce((s,c)=>s+c.c[2]*c.w,0)/tw;
+    }
+    const alpha = colors.length ? 0.4 : 0.15;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${r|0},${g|0},${b|0},${alpha})`;
+    ctx.fill();
+  });
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>

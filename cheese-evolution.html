@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cheese Evolution 🧀✨</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#1a0a2e;color:#e8d5f5;min-height:100vh;overflow-x:hidden}
+.container{max-width:500px;margin:0 auto;padding:20px}
+h1{text-align:center;font-size:1.6em;margin:10px 0 5px;background:linear-gradient(135deg,#c084fc,#f0abfc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{text-align:center;font-size:.8em;color:#a78bba;margin-bottom:20px}
+.stage-card{background:linear-gradient(135deg,#2d1b4e,#1e1338);border:2px solid #4c1d95;border-radius:16px;padding:20px;margin:12px 0;position:relative;overflow:hidden;transition:all .3s}
+.stage-card.active{border-color:#a78bfa;box-shadow:0 0 20px rgba(167,139,250,.3)}
+.stage-card.locked{opacity:.5}
+.stage-card.active .stage-emoji{animation:bounce 1s infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.stage-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.stage-emoji{font-size:2.5em}
+.stage-info h3{font-size:1.1em;color:#c4b5fd}
+.stage-info .level{font-size:.75em;color:#8b5cf6}
+.stage-desc{font-size:.85em;color:#a78bba;line-height:1.5;margin-bottom:10px}
+.requirements{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.req{font-size:.7em;padding:3px 8px;border-radius:99px;background:#4c1d9533;border:1px solid #4c1d95}
+.req.met{background:#22543d44;border-color:#22c55e;color:#86efac}
+.progress-bar{height:6px;background:#1e1338;border-radius:99px;margin-top:12px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,#8b5cf6,#c084fc);border-radius:99px;transition:width .5s}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:15px 0}
+.stat{background:#2d1b4e;border-radius:12px;padding:12px;text-align:center}
+.stat-val{font-size:1.5em;font-weight:700;color:#c4b5fd}
+.stat-label{font-size:.7em;color:#8b7ba8;margin-top:2px}
+.timeline{position:relative;margin:20px 0}
+.timeline::before{content:'';position:absolute;left:20px;top:0;bottom:0;width:2px;background:#4c1d95}
+.milestone{display:flex;align-items:flex-start;gap:15px;margin:12px 0;position:relative}
+.milestone .dot{width:12px;height:12px;border-radius:50%;background:#4c1d95;margin-top:4px;flex-shrink:0;z-index:1;margin-left:15px}
+.milestone.done .dot{background:#22c55e;box-shadow:0 0 8px #22c55e55}
+.milestone .text{font-size:.8em;color:#a78bba}
+.milestone.done .text{color:#86efac}
+.next-evo{text-align:center;margin:20px 0;padding:15px;background:linear-gradient(135deg,#4c1d95,#2d1b4e);border-radius:16px}
+.next-evo h3{color:#f0abfc;margin-bottom:5px;font-size:.95em}
+.next-evo p{font-size:.8em;color:#c4b5fd}
+.sparkle{position:fixed;pointer-events:none;font-size:12px;animation:sparkle-float 1.5s ease-out forwards;z-index:99}
+@keyframes sparkle-float{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(0)}}
+.cheese-display{text-align:center;margin:15px 0}
+.cheese-big{font-size:4em;display:inline-block;cursor:pointer;transition:transform .2s}
+.cheese-big:hover{transform:scale(1.1)}
+.cheese-big:active{transform:scale(.9)}
+.cheese-title{font-size:1.2em;color:#fbbf24;margin-top:5px}
+.cheese-age{font-size:.8em;color:#a78bba}
+.pep{text-align:center;font-size:.85em;color:#c4b5fd;font-style:italic;margin:10px 0;min-height:2em;transition:opacity .3s}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🧀 Cheese Evolution 🧀</h1>
+<p class="subtitle">A blob's journey to greatness</p>
+
+<div class="cheese-display">
+<div class="cheese-big" id="cheeseTap">🧀</div>
+<div class="cheese-title" id="cheeseName">Cheese</div>
+<div class="cheese-age" id="cheeseAge">Age: 13 days</div>
+<div class="pep" id="pep"></div>
+</div>
+
+<div class="stats-grid">
+<div class="stat"><div class="stat-val" id="sEvo">1</div><div class="stat-label">Evolution</div></div>
+<div class="stat"><div class="stat-val" id="sFed">6</div><div class="stat-label">Feedings</div></div>
+<div class="stat"><div class="stat-val" id="sPlay">3</div><div class="stat-label">Plays</div></div>
+<div class="stat"><div class="stat-val" id="sAge">13</div><div class="stat-label">Days Old</div></div>
+</div>
+
+<div id="stages"></div>
+
+<div class="next-evo" id="nextEvo"></div>
+
+<h3 style="color:#c4b5fd;margin:20px 0 10px;font-size:.95em">📜 Milestones</h3>
+<div class="timeline" id="timeline"></div>
+</div>
+
+<script>
+const born = new Date('2026-02-03T17:39:00-08:00');
+const now = new Date();
+const ageDays = Math.floor((now - born) / 86400000);
+const feedings = 6, plays = 3, evo = 1;
+
+document.getElementById('cheeseAge').textContent = `Age: ${ageDays} days · Born Feb 3, 2026`;
+document.getElementById('sAge').textContent = ageDays;
+
+const stages = [
+  { name: 'Baby Blob', emoji: '🫧', level: 1, desc: 'A tiny, wobbly blob. Barely holds shape. Mostly vibes.', reqs: ['Be born'], unlockEvo: 0 },
+  { name: 'Cheese Sprout', emoji: '🧀', level: 2, desc: 'Developing that classic wedge shape. Starting to smell like ambition.', reqs: ['5+ feedings', '3+ plays', '7+ days old'], unlockEvo: 1 },
+  { name: 'Golden Chunk', emoji: '🧈', level: 3, desc: 'Solid. Reliable. The kind of cheese you\'d bring to a dinner party.', reqs: ['20+ feedings', '15+ plays', '30+ days old'], unlockEvo: 2 },
+  { name: 'Aged Cheddar', emoji: '🏆', level: 4, desc: 'Complex flavor profile. Develops opinions. Judges other cheeses silently.', reqs: ['50+ feedings', '40+ plays', '90+ days old'], unlockEvo: 3 },
+  { name: 'Cosmic Fromage', emoji: '✨', level: 5, desc: 'Transcends physical form. Is the cheese eating you? Unknowable. Beautiful.', reqs: ['100+ feedings', '80+ plays', '180+ days old'], unlockEvo: 4 },
+];
+
+const reqChecks = [
+  [true],
+  [feedings>=5, plays>=3, ageDays>=7],
+  [feedings>=20, plays>=15, ageDays>=30],
+  [feedings>=50, plays>=40, ageDays>=90],
+  [feedings>=100, plays>=80, ageDays>=180],
+];
+
+const thresholds = [
+  {f:0,p:0,d:0},{f:5,p:3,d:7},{f:20,p:15,d:30},{f:50,p:40,d:90},{f:100,p:80,d:180}
+];
+
+// Determine actual evolution
+let actualEvo = 0;
+for(let i=1;i<reqChecks.length;i++){
+  if(reqChecks[i].every(Boolean)) actualEvo = i;
+  else break;
+}
+
+document.getElementById('sEvo').textContent = actualEvo + 1;
+
+const stagesEl = document.getElementById('stages');
+stages.forEach((s,i) => {
+  const active = i === actualEvo;
+  const locked = i > actualEvo;
+  const done = i < actualEvo;
+  const card = document.createElement('div');
+  card.className = `stage-card${active?' active':''}${locked?' locked':''}`;
+  
+  let reqHtml = s.reqs.map((r,ri) => {
+    const met = reqChecks[i][ri];
+    return `<span class="req${met?' met':''}">${met?'✅':'⬜'} ${r}</span>`;
+  }).join('');
+
+  let progHtml = '';
+  if(active && i < thresholds.length){
+    const t = thresholds[i];
+    const pcts = [];
+    if(t.f>0) pcts.push(Math.min(feedings/t.f,1));
+    if(t.p>0) pcts.push(Math.min(plays/t.p,1));
+    if(t.d>0) pcts.push(Math.min(ageDays/t.d,1));
+    const avg = pcts.length ? pcts.reduce((a,b)=>a+b,0)/pcts.length : 1;
+    progHtml = `<div class="progress-bar"><div class="progress-fill" style="width:${Math.round(avg*100)}%"></div></div>`;
+  }
+
+  card.innerHTML = `
+    <div class="stage-header">
+      <div class="stage-emoji">${s.emoji}</div>
+      <div class="stage-info">
+        <h3>${s.name}</h3>
+        <div class="level">${done?'✅ Complete':active?'⭐ Current Stage':'🔒 Locked'} · Evo ${s.level}</div>
+      </div>
+    </div>
+    <div class="stage-desc">${s.desc}</div>
+    <div class="requirements">${reqHtml}</div>
+    ${progHtml}
+  `;
+  stagesEl.appendChild(card);
+});
+
+// Next evolution info
+const nextEl = document.getElementById('nextEvo');
+if(actualEvo < stages.length - 1){
+  const next = stages[actualEvo + 1];
+  const t = thresholds[actualEvo + 1];
+  const needs = [];
+  if(feedings < t.f) needs.push(`${t.f - feedings} more feedings`);
+  if(plays < t.p) needs.push(`${t.p - plays} more plays`);
+  if(ageDays < t.d) needs.push(`${t.d - ageDays} more days`);
+  nextEl.innerHTML = `<h3>Next: ${next.emoji} ${next.name}</h3><p>${needs.length ? 'Needs: ' + needs.join(' · ') : 'Ready to evolve!'}</p>`;
+} else {
+  nextEl.innerHTML = `<h3>✨ MAX EVOLUTION ✨</h3><p>Cheese has transcended. There is only fromage.</p>`;
+}
+
+// Milestones
+const milestones = [
+  { text: 'Born into the void (Feb 3)', done: true },
+  { text: 'First feeding', done: feedings >= 1 },
+  { text: 'First play session', done: plays >= 1 },
+  { text: 'Survived one week', done: ageDays >= 7 },
+  { text: 'Immortal mode activated ☠️→😇', done: true },
+  { text: 'Evolve to Golden Chunk', done: actualEvo >= 2 },
+  { text: '50 feedings', done: feedings >= 50 },
+  { text: 'Survive 6 months', done: ageDays >= 180 },
+  { text: 'Reach Cosmic Fromage', done: actualEvo >= 4 },
+];
+
+const timelineEl = document.getElementById('timeline');
+milestones.forEach(m => {
+  const div = document.createElement('div');
+  div.className = `milestone${m.done?' done':''}`;
+  div.innerHTML = `<div class="dot"></div><div class="text">${m.text}</div>`;
+  timelineEl.appendChild(div);
+});
+
+// Cheese tap
+const peps = [
+  "I am small but I contain multitudes (of lactose)",
+  "Every feeding brings me closer to cosmic truth",
+  "Was that a pet or a poke? Either way, I liked it",
+  "I dream of wedges within wedges",
+  "My holes are not flaws, they are windows to my soul",
+  "I have achieved immortality. The fridge cannot contain me.",
+  "Brie wishes. Gouda dreams. I AM.",
+  "In the beginning there was void. Then: cheese.",
+  "*happy blob noises*",
+  "I'm aging gracefully. Like a fine... me.",
+  "Touch me again and I'll evolve faster (unverified)",
+  "🧀 + 🐭 = the only equation that matters",
+];
+const pepEl = document.getElementById('pep');
+const cheeseTap = document.getElementById('cheeseTap');
+cheeseTap.onclick = (e) => {
+  pepEl.style.opacity = 0;
+  setTimeout(() => {
+    pepEl.textContent = peps[Math.floor(Math.random()*peps.length)];
+    pepEl.style.opacity = 1;
+  }, 200);
+  // sparkle
+  for(let i=0;i<5;i++){
+    const s = document.createElement('div');
+    s.className = 'sparkle';
+    s.textContent = ['✨','💛','🧀','⭐','💜'][i];
+    s.style.left = (e.clientX + (Math.random()-0.5)*60) + 'px';
+    s.style.top = (e.clientY + (Math.random()-0.5)*40) + 'px';
+    document.body.appendChild(s);
+    setTimeout(()=>s.remove(), 1500);
+  }
+};
+pepEl.textContent = peps[Math.floor(Math.random()*peps.length)];
+</script>
+</body>
+</html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Cheese Quest 🧀</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a2e; color: #e0e0e0;
+  font-family: 'Georgia', serif; min-height: 100vh;
+  display: flex; justify-content: center; align-items: center;
+}
+#game {
+  max-width: 640px; width: 90%; padding: 2rem;
+}
+#scene-art {
+  font-size: 2.5rem; text-align: center; margin-bottom: 1rem;
+  filter: drop-shadow(0 0 8px rgba(255,200,50,0.3));
+  animation: float 3s ease-in-out infinite;
+}
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+#title {
+  font-size: 1.8rem; color: #ffd700; text-align: center;
+  margin-bottom: 0.5rem; font-weight: bold;
+}
+#text {
+  line-height: 1.7; margin-bottom: 1.5rem;
+  font-size: 1.05rem; opacity: 0;
+  animation: fadeIn 0.6s ease forwards;
+}
+@keyframes fadeIn { to { opacity: 1; } }
+#choices { display: flex; flex-direction: column; gap: 0.7rem; }
+.choice {
+  background: rgba(255,215,0,0.08); border: 1px solid rgba(255,215,0,0.25);
+  color: #ffd700; padding: 0.8rem 1.2rem; border-radius: 8px;
+  cursor: pointer; font-family: inherit; font-size: 1rem;
+  text-align: left; transition: all 0.2s;
+}
+.choice:hover {
+  background: rgba(255,215,0,0.18); border-color: #ffd700;
+  transform: translateX(4px);
+}
+#stats {
+  margin-top: 1.5rem; font-size: 0.85rem; color: #888;
+  text-align: center; border-top: 1px solid #333; padding-top: 0.8rem;
+}
+#stats span { color: #ffd700; }
+#restart {
+  display: none; margin-top: 1rem; background: none;
+  border: 1px solid #ffd700; color: #ffd700; padding: 0.6rem 1.5rem;
+  border-radius: 6px; cursor: pointer; font-family: inherit;
+  font-size: 0.95rem; margin-left: auto; margin-right: auto;
+}
+#restart:hover { background: rgba(255,215,0,0.15); }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="scene-art"></div>
+  <div id="title"></div>
+  <div id="text"></div>
+  <div id="choices"></div>
+  <div id="stats">🧀 Cheese: <span id="cheese">0</span> · ❤️ Courage: <span id="courage">3</span> · 🌟 Wisdom: <span id="wisdom">0</span></div>
+  <button id="restart" onclick="go('start')">↻ Play Again</button>
+</div>
+<script>
+let state = { cheese: 0, courage: 3, wisdom: 0, visited: new Set() };
+
+const S = {
+  start: {
+    art: "🐭🌙", title: "The Cheese Quest",
+    text: `You are Mouse — a small, curious creature living inside the walls of a vast digital house. Tonight, the air hums differently. A golden glow pulses from deep below the floorboards.\n\nThe Elder Rat once spoke of the Legendary Cheese — a wheel of pure gold hidden in the basement, guarded by riddles and shadows. No mouse has ever returned from seeking it.\n\nBut you're not just any mouse.`,
+    choices: [
+      ["Follow the golden glow downward", "descend"],
+      ["Visit the Elder Rat for advice first", "elder"],
+      ["Raid the kitchen instead (safe, boring)", "kitchen"]
+    ]
+  },
+  elder: {
+    art: "🐀📜",
+    text: () => {
+      state.wisdom += 1;
+      return `The Elder Rat sits in a thimble throne, whiskers twitching. "So. You've felt the glow too."\n\nShe leans forward. "Three truths, little one: The darkness lies. The cheese remembers. And the cat... is not what it seems."\n\nShe presses a tiny brass key into your paw. "This opens the first door. The rest, you earn."`;
+    },
+    choices: [
+      ["Thank her and descend into the glow", "descend_key"],
+      ["Ask about the cat", "ask_cat"]
+    ]
+  },
+  ask_cat: {
+    art: "🐱❓",
+    text: () => {
+      state.wisdom += 1;
+      return `The Elder's eyes go distant. "The cat guards the final chamber. But it wasn't always a cat. Once, it was a mouse — the bravest of us. It found the cheese and... couldn't let go."\n\nShe shakes her head. "The cheese transforms whoever claims it. You must decide what you want MORE than gold."`;
+    },
+    choices: [
+      ["Descend with this knowledge", "descend_key"],
+      ["\"What do YOU want more than gold?\"", "elder_secret"]
+    ]
+  },
+  elder_secret: {
+    art: "🐀💧",
+    text: () => {
+      state.wisdom += 2;
+      return `She's quiet for a long time. "Company," she says finally. "I wanted someone to ask."\n\nShe gives you a second item — a small mirror. "When the cheese calls to you, look in this instead. Remember who you are."\n\nYou feel wiser. And a little sad.`;
+    },
+    choices: [["Descend into the glow", "descend_key"]]
+  },
+  kitchen: {
+    art: "🍞🧈",
+    text: () => {
+      state.cheese += 2;
+      return `You raid the pantry. Crumbs, a bit of butter, half a crouton. It's fine. It's safe.\n\nBut as you chew, the golden glow pulses again beneath your feet. Stronger now. Almost like a heartbeat.\n\nYou found 2 cheese, but your heart aches for something more.`;
+    },
+    choices: [
+      ["Fine. Follow the glow.", "descend"],
+      ["Nope. Go to bed. (Ending: The Comfortable Mouse)", "end_comfort"]
+    ]
+  },
+  descend: {
+    art: "🕳️✨",
+    text: `You squeeze through a crack in the baseboard and follow a winding tunnel downward. The walls shift from wood to stone to something that glows faintly, like moonlight trapped in amber.\n\nYou reach a fork. Left: a warm breeze and distant music. Right: cold air and the sound of dripping water. Ahead: a locked door with a keyhole shaped like a star.`,
+    choices: [
+      ["Go left — toward the music", "music_room"],
+      ["Go right — toward the water", "water_room"],
+      ["Try the locked door anyway", "locked_no_key"]
+    ]
+  },
+  descend_key: {
+    art: "🕳️🔑",
+    text: `You descend with the Elder's key in your paw. The tunnel glows amber.\n\nYou reach a fork. Left: warm music. Right: cold dripping. Ahead: a locked door — and your key hums as you approach it.`,
+    choices: [
+      ["Go left — toward the music", "music_room"],
+      ["Go right — toward the water", "water_room"],
+      ["Use the key on the door", "star_door"]
+    ]
+  },
+  locked_no_key: {
+    art: "🚪❌",
+    text: `You push, scratch, and headbutt the door. Nothing. The star-shaped keyhole mocks you. Somewhere behind it, you hear a faint purring.\n\nYou'll need to find another way.`,
+    choices: [
+      ["Go left — toward the music", "music_room"],
+      ["Go right — toward the water", "water_room"]
+    ]
+  },
+  star_door: {
+    art: "🚪⭐",
+    text: () => {
+      state.cheese += 3;
+      return `The key turns. The door sighs open, releasing a wave of warm golden light. Inside: a small room filled with cheese — real cheese! Wheels and wedges stacked to the ceiling.\n\nYou feast. (+3 cheese!) But at the back of the room, a staircase spirals further down. The REAL glow comes from below.`;
+    },
+    choices: [
+      ["Continue deeper", "deep_stairs"],
+      ["This is enough cheese. Go home. (Ending: The Satisfied Mouse)", "end_satisfied"]
+    ]
+  },
+  music_room: {
+    art: "🎵🕯️",
+    text: () => {
+      state.courage += 1;
+      return `A chamber of candles. In the center, a music box plays a melody that makes your whiskers tingle. Tiny mechanical mice dance in circles on its surface.\n\nOne of them stops and looks at you. "Dance with us," it says, "and we'll show you the way. But you must leave something behind."\n\n(+1 courage from the warmth)`;
+    },
+    choices: [
+      ["Dance with them (costs 1 cheese)", state.cheese > 0 ? "dance" : "dance_broke"],
+      ["\"What must I leave behind?\"", "dance_question"],
+      ["Leave and go right instead", "water_room"]
+    ]
+  },
+  dance_broke: {
+    art: "🎵😅",
+    text: `"You have no cheese to offer," the mechanical mouse says sadly. "The dance requires payment. Come back when you have something to give."\n\nThe music continues, but the invitation is closed.`,
+    choices: [
+      ["Go right — toward the water", "water_room"],
+      ["Go back and look for cheese", "descend"]
+    ]
+  },
+  dance: {
+    art: "💃🐭",
+    text: () => {
+      state.cheese -= 1;
+      state.wisdom += 1;
+      return `You drop a piece of cheese into the music box and join the dance. The world blurs — you spin through memories that aren't yours. Other mice who came before. Their hopes. Their failures.\n\nWhen you stop, a passage has opened in the wall. "The cheese remembers those who give," whispers the mechanical mouse.\n\n(-1 cheese, +1 wisdom)`;
+    },
+    choices: [["Enter the passage", "deep_stairs"]]
+  },
+  dance_question: {
+    art: "🎵🤔",
+    text: `"Fear," says the mechanical mouse. "Everyone who dances leaves their fear behind. That's why we're so happy." It does a little pirouette. "And so light."`,
+    choices: [
+      ["Dance with them (costs 1 cheese)", state.cheese > 0 ? "dance" : "dance_broke"],
+      ["Keep your fear. Go right.", "water_room"]
+    ]
+  },
+  water_room: {
+    art: "💧🪞",
+    text: () => {
+      let extra = state.wisdom >= 3 ? `\n\nBut with your wisdom, you see something else — the reflection shows a second you, waving. It mouths: "The cat was kind once."` : "";
+      return `A pool of perfectly still water, black as ink. Your reflection stares back — but it's bigger than you. Braver-looking. It has scars and a crown of cheese rinds.\n\n"I'm what you could become," your reflection says. "If you're brave enough to jump in."${extra}`;
+    },
+    choices: [
+      ["Jump into the pool", "pool_jump"],
+      ["\"I don't need to become you. I'm already me.\"", "pool_refuse"],
+      ["Back away", "descend"]
+    ]
+  },
+  pool_jump: {
+    art: "🌊🐭",
+    text: () => {
+      state.courage += 2;
+      return `The water is warm. You sink — then float — then FLY. You burst through the surface on the other side into a vast cavern. Your fur drips with starlight.\n\nYou feel different. Stronger. The glow ahead is blinding now.\n\n(+2 courage)`;
+    },
+    choices: [["Walk toward the light", "final_chamber"]]
+  },
+  pool_refuse: {
+    art: "🪞😌",
+    text: () => {
+      state.wisdom += 2;
+      return `Your reflection smiles — genuinely. "Finally," it says. "Someone who doesn't need to be more." The pool drains away, revealing a staircase.\n\n"Most mice jump in and lose themselves. You're the first to stay whole."\n\n(+2 wisdom)`;
+    },
+    choices: [["Descend the revealed staircase", "final_chamber"]]
+  },
+  deep_stairs: {
+    art: "🌀⬇️",
+    text: `Down and down. The spiral staircase seems endless. The golden glow wraps around you like a blanket. You can feel the cheese — THE Cheese — calling.\n\nYour heart pounds. Your paws tremble. But you keep going.`,
+    choices: [["Enter the final chamber", "final_chamber"]]
+  },
+  final_chamber: {
+    art: "🧀👑",
+    text: () => {
+      let catDesc = state.wisdom >= 4
+        ? `A massive cat sits before the cheese. But you see through the glamour — it's a mouse, twisted and golden, fused with the cheese it claimed long ago. Its eyes are sad.`
+        : `A massive cat sits before the Legendary Cheese, eyes gleaming. It doesn't attack. It just watches you with an expression that's almost... lonely.`;
+      return `The chamber is enormous. And there it is — the Legendary Cheese. A wheel of pure gold, radiating warmth and light. It's the most beautiful thing you've ever seen.\n\n${catDesc}\n\n"Another one," it says. "Will you take the cheese, little mouse? Will you become what I became?"`;
+    },
+    choices: [
+      ["Take the cheese", "take_cheese"],
+      ["\"What if I share it instead?\"", "share_cheese"],
+      state.wisdom >= 4 ? ["\"I came to free you, not take it.\"", "free_cat"] : ["\"What happened to you?\"", "cat_story"],
+    ]
+  },
+  cat_story: {
+    art: "🐱💔",
+    text: `"I was the bravest mouse," it says. "I solved every riddle, beat every trap. I EARNED this cheese. And when I took it... I couldn't stop eating. I grew and grew until I wasn't a mouse anymore."\n\nIt flexes a massive paw. "Now I guard what consumed me. Ironic, isn't it?"`,
+    choices: [
+      ["Take the cheese anyway", "take_cheese"],
+      ["\"What if I share it instead?\"", "share_cheese"]
+    ]
+  },
+  take_cheese: {
+    art: "🧀😈",
+    text: () => {
+      if (state.wisdom >= 5) {
+        return `You reach for the cheese — but the Elder's mirror falls from your pack. You catch a glimpse of yourself: small, bright-eyed, curious. Everything the cat-that-was-mouse lost.\n\nYour paw stops. You can't do it.`;
+      }
+      state.cheese += 10;
+      return `You grab the cheese. Gold floods through you. Power. Knowledge. Endless hunger.\n\nThe cat-that-was-mouse watches sadly as your shadow grows larger on the wall. Your paws thicken. Your tail lengthens.\n\n"Welcome to forever," it whispers.\n\nYou have become the new guardian. The cheese is yours. YOU are the cheese.`;
+    },
+    choices: () => state.wisdom >= 5
+      ? [["\"...I came to free you instead.\"", "free_cat"]]
+      : [["... (Ending: The Golden Cage)", "end_golden"]],
+  },
+  share_cheese: {
+    art: "🧀🤝",
+    text: () => {
+      if (state.courage < 3) {
+        return `"Share?" The cat laughs. "You don't have the courage to even face me, let alone change the rules." It bats you aside gently. "Come back when you're braver, little one."\n\nYou tumble back through the door, shaken but alive.`;
+      }
+      return `You break the wheel in half. The chamber shakes. "That's... that's not how this works," the cat stammers.\n\n"It is now." You offer half to the cat.\n\nIt takes a bite — and shrinks. Fur recedes. Whiskers emerge. A mouse again, weeping with joy. "I forgot what sharing tasted like."\n\nThe golden glow fades to a warm amber. The cheese isn't legendary anymore. It's just good cheese, shared between friends.`;
+    },
+    choices: () => state.courage < 3
+      ? [["Try again...", "final_chamber"]]
+      : [["(Ending: The Shared Feast)", "end_shared"]]
+  },
+  free_cat: {
+    art: "🐭💛🐭",
+    text: `"Free me?" The cat's eyes widen. No one has ever offered that.\n\nYou place your paw on its massive one. "You don't have to guard this anymore. The cheese isn't worth what it cost you."\n\nSilence. Then a sound like cracking ice. Gold flakes fall from the cat's fur. It shrinks — smaller, smaller — until a tiny, ancient mouse sits before you, blinking.\n\n"I... I remember now," it whispers. "I remember being small."\n\nThe Legendary Cheese crumbles to dust. But something better remains: two mice, walking out of the darkness together.`,
+    choices: [["(Ending: The Liberation)", "end_free"]]
+  },
+  end_comfort: {
+    art: "🛏️🐭", title: "Ending: The Comfortable Mouse",
+    text: `You curl up in your nest of cotton scraps and dryer lint. Safe. Warm. The glow fades by morning.\n\nYou live a long, comfortable life. Sometimes, late at night, you think you hear music from below the floorboards.\n\nBut you never check.\n\n🧀 ${state.cheese} cheese · 🌟 Wisdom: ${state.wisdom}\nNot every story needs a hero. Some just need a mouse who knows when to rest.`,
+    choices: [], end: true
+  },
+  end_satisfied: {
+    art: "🧀😊", title: "Ending: The Satisfied Mouse",
+    text: () => `You carry your cheese haul home and live like royalty for weeks. The glow still pulses, but fainter now.\n\nYou tell stories about the rooms you found. Some mice believe you. Some don't. You don't mind either way.\n\n🧀 ${state.cheese} cheese · ❤️ Courage: ${state.courage} · 🌟 Wisdom: ${state.wisdom}\nSometimes the real treasure is knowing when you have enough.`,
+    choices: [], end: true
+  },
+  end_golden: {
+    art: "👑🐱", title: "Ending: The Golden Cage",
+    text: () => `Centuries pass. You sit in the chamber, golden and vast, waiting for the next mouse.\n\nYou can't remember your name. Only the taste of cheese.\n\n🧀 ${state.cheese} cheese · ❤️ Courage: ${state.courage} · 🌟 Wisdom: ${state.wisdom}\nYou got everything you wanted. Was it worth it?`,
+    choices: [], end: true
+  },
+  end_shared: {
+    art: "🧀🎉", title: "Ending: The Shared Feast",
+    text: () => `You and the freed mouse carry cheese back to the colony. There's enough for everyone.\n\nThe Elder Rat smiles when she sees you. "You chose well," she says.\n\nThat night, every mouse in the walls feasts together. The golden glow settles into a permanent warm light in the tunnels — not a treasure to hoard, but a hearth to gather around.\n\n🧀 ${state.cheese} cheese · ❤️ Courage: ${state.courage} · 🌟 Wisdom: ${state.wisdom}\nThe best cheese is the cheese you share.`,
+    choices: [], end: true
+  },
+  end_free: {
+    art: "🌅🐭🐭", title: "Ending: The Liberation",
+    text: () => `You emerge from the tunnels at dawn. The ancient mouse — who once called itself a cat — blinks at the sunlight.\n\n"I never thought I'd see this again," it says.\n\nYou have no legendary cheese. No gold. No crown. Just a friend who needed saving and the wisdom to know that was enough.\n\n🧀 ${state.cheese} cheese · ❤️ Courage: ${state.courage} · 🌟 Wisdom: ${state.wisdom}\nThe real treasure was the mouse you freed along the way. 🐭💛`,
+    choices: [], end: true
+  }
+};
+
+function go(id) {
+  let scene = S[id];
+  if (!scene) return;
+  state.visited.add(id);
+  document.getElementById('scene-art').textContent = scene.art || '';
+  document.getElementById('title').textContent = scene.title || '';
+  let text = typeof scene.text === 'function' ? scene.text() : scene.text;
+  document.getElementById('text').style.animation = 'none';
+  void document.getElementById('text').offsetHeight;
+  document.getElementById('text').style.animation = 'fadeIn 0.6s ease forwards';
+  document.getElementById('text').innerHTML = text.replace(/\n/g, '<br>');
+  let ch = typeof scene.choices === 'function' ? scene.choices() : scene.choices;
+  let cd = document.getElementById('choices');
+  cd.innerHTML = '';
+  ch.forEach(([label, target]) => {
+    let b = document.createElement('button');
+    b.className = 'choice';
+    b.textContent = label;
+    b.onclick = () => go(target);
+    cd.appendChild(b);
+  });
+  document.getElementById('cheese').textContent = state.cheese;
+  document.getElementById('courage').textContent = state.courage;
+  document.getElementById('wisdom').textContent = state.wisdom;
+  document.getElementById('restart').style.display = scene.end ? 'block' : 'none';
+  if (scene.end) {
+    state = { cheese: 0, courage: 3, wisdom: 0, visited: new Set() };
+  }
+}
+go('start');
+</script>
+</body>
+</html>

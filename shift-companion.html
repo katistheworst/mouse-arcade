@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shift Companion 🐭</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#1a0a2e,#2d1b4e,#1a0a2e);color:#e8d5f5;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px;overflow-x:hidden}
+h1{font-size:1.6em;margin-bottom:4px;background:linear-gradient(90deg,#e8a0f0,#a0c4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{font-size:.85em;color:#b088c0;margin-bottom:20px}
+.card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px;margin:8px 0;width:100%;max-width:420px;backdrop-filter:blur(10px)}
+.card h2{font-size:1.1em;margin-bottom:12px;color:#d4a0ff}
+.progress-wrap{background:rgba(0,0,0,.3);border-radius:12px;height:28px;overflow:hidden;position:relative;margin:8px 0}
+.progress-bar{height:100%;border-radius:12px;background:linear-gradient(90deg,#7b2ff2,#c471f5,#f59ae0);transition:width .5s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:.75em;font-weight:700;min-width:40px}
+.time-big{font-size:2.8em;font-weight:700;text-align:center;background:linear-gradient(90deg,#c471f5,#f59ae0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1}
+.time-label{text-align:center;font-size:.85em;color:#b088c0;margin-bottom:4px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.stat{text-align:center;padding:10px;background:rgba(255,255,255,.04);border-radius:10px}
+.stat-val{font-size:1.4em;font-weight:700;color:#e8a0f0}
+.stat-lbl{font-size:.7em;color:#9a7bad;margin-top:2px}
+.cheese{font-size:2.2em;text-align:center;margin:8px 0;cursor:pointer;user-select:none;transition:transform .2s}
+.cheese:hover{transform:scale(1.15)}
+.cheese.wiggle{animation:wiggle .4s ease}
+@keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg) scale(1.1)}75%{transform:rotate(8deg) scale(1.1)}}
+.msg{text-align:center;font-size:.9em;color:#d4bfe8;min-height:2.5em;line-height:1.4;padding:4px 8px;transition:opacity .3s}
+.break-btn{display:block;margin:12px auto 0;padding:10px 24px;background:linear-gradient(135deg,#7b2ff2,#c471f5);color:#fff;border:none;border-radius:10px;font-size:.9em;cursor:pointer;font-weight:600;transition:transform .15s,box-shadow .15s}
+.break-btn:hover{transform:translateY(-2px);box-shadow:0 4px 15px rgba(123,47,242,.4)}
+.break-btn:active{transform:scale(.97)}
+.break-timer{text-align:center;font-size:1.8em;font-weight:700;color:#f59ae0;margin:8px 0}
+.break-msg{text-align:center;font-size:.8em;color:#b088c0}
+.milestone{text-align:center;padding:6px;margin:4px 0;border-radius:8px;font-size:.8em;display:flex;align-items:center;gap:6px;justify-content:center}
+.milestone.done{color:#7be88a;text-decoration:line-through;opacity:.6}
+.milestone.next{color:#f5c46b;background:rgba(245,196,107,.08)}
+.milestone.future{color:#8a7a9e}
+.config{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.config label{font-size:.75em;color:#9a7bad}
+.config input,.config select{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#e8d5f5;border-radius:6px;padding:4px 8px;font-size:.8em;width:80px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<h1>Shift Companion 🐭</h1>
+<p class="subtitle">you've got this, kat</p>
+
+<div class="card">
+<h2>⏱️ Shift Progress</h2>
+<div class="progress-wrap"><div class="progress-bar" id="bar">0%</div></div>
+<div class="time-label" id="shiftLabel">loading...</div>
+<div class="time-big" id="timeLeft">--:--</div>
+<div class="time-label">remaining</div>
+<div class="stats">
+<div class="stat"><div class="stat-val" id="elapsed">-</div><div class="stat-lbl">ELAPSED</div></div>
+<div class="stat"><div class="stat-val" id="clock">-</div><div class="stat-lbl">RIGHT NOW</div></div>
+</div>
+</div>
+
+<div class="card">
+<h2>🏁 Milestones</h2>
+<div id="milestones"></div>
+</div>
+
+<div class="card">
+<div class="cheese" id="cheese" title="Click for encouragement!">🧀</div>
+<div class="msg" id="msg">Click Cheese for a pep talk!</div>
+<button class="break-btn" id="breakBtn">☕ Take a 5-min Break</button>
+<div class="hidden" id="breakBox">
+<div class="break-timer" id="breakTime">5:00</div>
+<div class="break-msg">breathe. stretch. sip water. 💜</div>
+<button class="break-btn" id="endBreak">End Break Early</button>
+</div>
+</div>
+
+<div class="card">
+<h2>⚙️ Shift Times</h2>
+<div class="config">
+<div><label>Start</label><br><input type="time" id="startTime" value="12:00"></div>
+<div><label>End</label><br><input type="time" id="endTime" value="20:00"></div>
+<div><label>Break (min)</label><br><input type="number" id="breakMin" value="5" min="1" max="30"></div>
+</div>
+</div>
+
+<script>
+const schedules={0:[12,20],1:[8,20],4:[8,20],5:[8,16],6:[12,20]};
+const dow=new Date().getDay();
+if(schedules[dow]){
+  document.getElementById('startTime').value=String(schedules[dow][0]).padStart(2,'0')+':00';
+  document.getElementById('endTime').value=String(schedules[dow][1]).padStart(2,'0')+':00';
+}
+
+const cheeseMsgs=[
+  "You're doing amazing! Every call is closer to that tier 💰",
+  "Halfway there is still HALF DONE. That's huge!",
+  "Remember: you're literally getting paid to talk. Living the dream 📞",
+  "Commission doesn't sleep, and neither does your hustle 💪",
+  "One more consult. Then another. Then suddenly it's 8pm 🎉",
+  "The DI in you eats shifts like this for breakfast",
+  "Cheese believes in you! 🧀✨ (Cheese always believes in you)",
+  "Fun fact: you've survived 100% of your shifts so far",
+  "Your ENTP brain is a WEAPON on these calls. Use it!",
+  "Every 'I need to think about it' is just a 'yes' in disguise",
+  "You didn't come this far to only come this far 🚀",
+  "Imagine the commission check. Now close another one 💸",
+  "Shift math: every hour done is one you never do again",
+  "Cheese would buy laser if Cheese had body hair. Alas, blob.",
+  "Mouse is here. Mouse is rooting for you. Mouse made you a dashboard about it. 🐭",
+  "Take a breath. You're competent and they're lucky to talk to you.",
+  "That objection? You've handled worse. Pivot and close.",
+  "Remember: top performers aren't perfect, they're persistent.",
+  "The call you're dreading will probably be your best close today.",
+  "Sunday shift = less competition on the phones. Easy money 😎"
+];
+let msgIdx=0;
+
+const milestoneTempl=[
+  {pct:0,icon:'🟢',text:'Shift started — let\'s go!'},
+  {pct:25,icon:'🔥',text:'25% done — warming up'},
+  {pct:50,icon:'⭐',text:'HALFWAY! Downhill from here'},
+  {pct:75,icon:'🚀',text:'75% — home stretch!'},
+  {pct:90,icon:'🏁',text:'90% — almost FREE'},
+  {pct:100,icon:'🎉',text:'DONE! Go live your life!'}
+];
+
+function getShiftMs(){
+  const s=document.getElementById('startTime').value.split(':').map(Number);
+  const e=document.getElementById('endTime').value.split(':').map(Number);
+  const now=new Date();
+  const start=new Date(now);start.setHours(s[0],s[1],0,0);
+  const end=new Date(now);end.setHours(e[0],e[1],0,0);
+  if(end<=start)end.setDate(end.getDate()+1);
+  return{start,end,total:end-start};
+}
+
+function fmt(ms){
+  if(ms<0)ms=0;
+  const h=Math.floor(ms/3600000);
+  const m=Math.floor((ms%3600000)/60000);
+  const s=Math.floor((ms%60000)/1000);
+  return h>0?`${h}h ${String(m).padStart(2,'0')}m`:`${m}:${String(s).padStart(2,'0')}`;
+}
+
+function update(){
+  const{start,end,total}=getShiftMs();
+  const now=Date.now();
+  const elapsed=Math.max(0,now-start);
+  const remain=Math.max(0,end-now);
+  const pct=Math.min(100,Math.max(0,(elapsed/total)*100));
+
+  document.getElementById('bar').style.width=pct+'%';
+  document.getElementById('bar').textContent=Math.round(pct)+'%';
+  document.getElementById('timeLeft').textContent=fmt(remain);
+  document.getElementById('elapsed').textContent=fmt(elapsed);
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
+  if(now<start)document.getElementById('shiftLabel').textContent='Shift starts in '+fmt(start-now);
+  else if(now>end)document.getElementById('shiftLabel').textContent='🎉 Shift complete!';
+  else document.getElementById('shiftLabel').textContent=Math.round(pct)+'% through your shift';
+
+  const ml=document.getElementById('milestones');
+  ml.innerHTML='';
+  milestoneTempl.forEach(m=>{
+    const d=document.createElement('div');
+    d.className='milestone '+(pct>=m.pct?'done':milestoneTempl.find(x=>x.pct>pct&&milestoneTempl.indexOf(x)===milestoneTempl.indexOf(m))?'next':'future');
+    if(!ml.querySelector('.next')&&pct<m.pct){d.className='milestone next';}
+    d.textContent=m.icon+' '+m.text;
+    ml.appendChild(d);
+  });
+}
+
+// Cheese click
+document.getElementById('cheese').addEventListener('click',function(){
+  this.classList.remove('wiggle');
+  void this.offsetWidth;
+  this.classList.add('wiggle');
+  document.getElementById('msg').style.opacity=0;
+  setTimeout(()=>{
+    document.getElementById('msg').textContent=cheeseMsgs[msgIdx%cheeseMsgs.length];
+    document.getElementById('msg').style.opacity=1;
+    msgIdx++;
+  },200);
+});
+
+// Break timer
+let breakInterval=null;
+document.getElementById('breakBtn').addEventListener('click',function(){
+  this.classList.add('hidden');
+  document.getElementById('breakBox').classList.remove('hidden');
+  let secs=parseInt(document.getElementById('breakMin').value)*60;
+  const bt=document.getElementById('breakTime');
+  breakInterval=setInterval(()=>{
+    secs--;
+    if(secs<=0){clearInterval(breakInterval);endBreak();return;}
+    bt.textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');
+  },1000);
+  bt.textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');
+});
+document.getElementById('endBreak').addEventListener('click',()=>{clearInterval(breakInterval);endBreak();});
+function endBreak(){
+  document.getElementById('breakBox').classList.add('hidden');
+  document.getElementById('breakBtn').classList.remove('hidden');
+  document.getElementById('msg').textContent='Break done! Back at it 💪';
+}
+
+['startTime','endTime'].forEach(id=>document.getElementById(id).addEventListener('change',update));
+setInterval(update,1000);
+update();
+</script>
+</body>
+</html>
