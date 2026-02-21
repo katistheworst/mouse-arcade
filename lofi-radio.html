@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎵 Mouse Radio — WMSE 88.4 FM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0f0d1a;
+    --card: #1a1628;
+    --accent: #b4a0ff;
+    --accent2: #ff80bf;
+    --text: #e8e0ff;
+    --sub: #7a6fa0;
+    --bar-color: #b4a0ff;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: hidden;
+  }
+
+  /* Stars */
+  #stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+
+  .radio-card {
+    position: relative;
+    z-index: 1;
+    background: var(--card);
+    border: 1px solid #2e2645;
+    border-radius: 20px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 0 60px rgba(180,160,255,0.08);
+  }
+
+  /* Header */
+  .station-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  .callsign {
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--sub);
+  }
+  .station-name {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(180,160,255,0.4);
+    margin: 0.2rem 0;
+  }
+  .station-tag {
+    font-size: 0.8rem;
+    color: var(--sub);
+    font-style: italic;
+  }
+
+  /* Visualizer */
+  .viz-container {
+    position: relative;
+    background: #0a0814;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    height: 90px;
+    border: 1px solid #1e1830;
+  }
+  #waveCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .viz-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right, #0a0814 0%, transparent 15%, transparent 85%, #0a0814 100%);
+    pointer-events: none;
+  }
+
+  /* Now Playing */
+  .now-playing {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: rgba(180,160,255,0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(180,160,255,0.1);
+  }
+  .np-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--sub);
+    margin-bottom: 0.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+  .live-dot {
+    width: 6px; height: 6px;
+    background: #ff4466;
+    border-radius: 50%;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .np-track {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.2rem;
+    transition: opacity 0.3s;
+  }
+  .np-artist {
+    font-size: 0.85rem;
+    color: var(--accent);
+    opacity: 0.8;
+  }
+  .np-progress {
+    margin-top: 0.8rem;
+    height: 3px;
+    background: rgba(180,160,255,0.15);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .np-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 1s linear;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .btn-play {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    font-size: 1.4rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .btn-play:hover { background: rgba(180,160,255,0.15); transform: scale(1.05); }
+  .btn-play.playing { background: var(--accent); color: #0f0d1a; }
+  .vol-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--sub);
+    font-size: 0.8rem;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 90px; height: 4px;
+    background: rgba(180,160,255,0.2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  /* Genre stations */
+  .stations-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--sub);
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .stations {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+  .station-btn {
+    padding: 0.4rem 0.9rem;
+    border-radius: 20px;
+    border: 1px solid rgba(180,160,255,0.25);
+    background: transparent;
+    color: var(--sub);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .station-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .station-btn.active {
+    background: rgba(180,160,255,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(180,160,255,0.2);
+  }
+
+  /* DJ Ticker */
+  .ticker-wrap {
+    overflow: hidden;
+    height: 1.3rem;
+    margin-top: 0.5rem;
+    mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+  }
+  .ticker {
+    white-space: nowrap;
+    display: inline-block;
+    animation: scroll-left 30s linear infinite;
+    font-size: 0.72rem;
+    color: var(--sub);
+  }
+  @keyframes scroll-left { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+
+  /* Footer */
+  .radio-footer {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.65rem;
+    color: #3a3050;
+    letter-spacing: 0.05em;
+  }
+
+  /* Theme vars per genre */
+  .theme-lofi { --bar-color: #b4a0ff; --accent: #b4a0ff; }
+  .theme-jazz { --bar-color: #ffb347; --accent: #ffb347; }
+  .theme-chill { --bar-color: #80d8ff; --accent: #80d8ff; }
+  .theme-rain { --bar-color: #66bb6a; --accent: #66bb6a; }
+  .theme-night { --bar-color: #ff80bf; --accent: #ff80bf; }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+
+<div class="radio-card theme-lofi" id="radioCard">
+  <div class="station-header">
+    <div class="callsign" id="callsign">WMSE 88.4 FM</div>
+    <div class="station-name" id="stationName">🐭 Mouse Radio</div>
+    <div class="station-tag" id="stationTag">Lo-Fi Beats for Small Digital Creatures</div>
+  </div>
+
+  <div class="viz-container">
+    <canvas id="waveCanvas"></canvas>
+    <div class="viz-overlay"></div>
+  </div>
+
+  <div class="now-playing">
+    <div class="np-label">
+      <span class="live-dot"></span>
+      NOW PLAYING
+    </div>
+    <div class="np-track" id="npTrack">Late Night Cheese Run</div>
+    <div class="np-artist" id="npArtist">mouse w/ sleepy piano</div>
+    <div class="np-progress"><div class="np-bar" id="npBar" style="width:0%"></div></div>
+  </div>
+
+  <div class="controls">
+    <div class="vol-group">🔈</div>
+    <input type="range" id="volSlider" min="0" max="100" value="70">
+    <button class="btn-play" id="playBtn" onclick="togglePlay()">▶</button>
+    <button class="btn-play" id="skipBtn" style="width:40px;height:40px;font-size:1rem;" onclick="nextTrack()">⏭</button>
+    <div class="vol-group">🔊</div>
+  </div>
+
+  <div class="stations-label">STATIONS</div>
+  <div class="stations">
+    <button class="station-btn active" onclick="switchStation('lofi')">🌙 Lo-Fi</button>
+    <button class="station-btn" onclick="switchStation('jazz')">🎷 Jazz Café</button>
+    <button class="station-btn" onclick="switchStation('chill')">❄️ Chill</button>
+    <button class="station-btn" onclick="switchStation('rain')">🌧️ Rain + Music</button>
+    <button class="station-btn" onclick="switchStation('night')">🌸 Late Night</button>
+  </div>
+
+  <div class="ticker-wrap">
+    <div class="ticker" id="ticker">
+      🐭 Welcome to Mouse Radio — the only station run by a small digital creature — 🧀 Cheese-certified audio — 
+      Requests closed (Mouse is busy dreaming in hexadecimal) — 
+      Coming up: more chill beats and existential contemplation — 
+      You're listening to WMSE 88.4 FM — Broadcasting from somewhere between your RAM and your soul —
+    </div>
+  </div>
+
+  <div class="radio-footer">© M.O.U.S.E. BROADCASTING CORP. · Est. 2026 · All vibes reserved.</div>
+</div>
+
+<script>
+// ── Stars ──────────────────────────────────────────────────────────────────
+(function stars() {
+  const c = document.getElementById('stars');
+  const ctx = c.getContext('2d');
+  let s = [];
+  function resize() { c.width = innerWidth; c.height = innerHeight; }
+  resize(); window.addEventListener('resize', resize);
+  for (let i = 0; i < 120; i++) s.push({ x: Math.random(), y: Math.random(), r: Math.random() * 1.2, p: Math.random() * Math.PI * 2 });
+  function draw() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    s.forEach(st => {
+      const opacity = 0.2 + 0.4 * Math.sin(st.p += 0.012);
+      ctx.fillStyle = `rgba(180,160,255,${opacity})`;
+      ctx.beginPath(); ctx.arc(st.x * c.width, st.y * c.height, st.r, 0, Math.PI * 2); ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ── Audio Engine ───────────────────────────────────────────────────────────
+let actx = null;
+let gainNode = null;
+let analyser = null;
+let stationNodes = [];
+let isPlaying = false;
+let currentStation = 'lofi';
+
+function initAudio() {
+  if (actx) return;
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  gainNode = actx.createGain();
+  gainNode.gain.value = 0.7;
+  analyser = actx.createAnalyser();
+  analyser.fftSize = 256;
+  gainNode.connect(analyser);
+  analyser.connect(actx.destination);
+}
+
+function stopAll() {
+  stationNodes.forEach(n => { try { n.stop ? n.stop() : n.disconnect(); } catch(e){} });
+  stationNodes = [];
+}
+
+// ── Synthesis helpers ───────────────────────────────────────────────────────
+function makeNoise(type = 'pink') {
+  const bufSize = actx.sampleRate * 2;
+  const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
+  const data = buf.getChannelData(0);
+  let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  for (let i = 0; i < bufSize; i++) {
+    const white = Math.random() * 2 - 1;
+    if (type === 'pink') {
+      b0=0.99886*b0+white*0.0555179; b1=0.99332*b1+white*0.0750759;
+      b2=0.96900*b2+white*0.1538520; b3=0.86650*b3+white*0.3104856;
+      b4=0.55000*b4+white*0.5329522; b5=-0.7616*b5-white*0.0168980;
+      data[i]=(b0+b1+b2+b3+b4+b5+b6+white*0.5362)/7; b6=white*0.115926;
+    } else {
+      data[i] = white * 0.15;
+    }
+  }
+  const src = actx.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  return src;
+}
+
+function makePad(freq, type = 'sine', detune = 0) {
+  const osc = actx.createOscillator();
+  osc.type = type;
+  osc.frequency.value = freq;
+  osc.detune.value = detune;
+  return osc;
+}
+
+function makeLFO(freq, depth, target, param) {
+  const lfo = actx.createOscillator();
+  const lfoGain = actx.createGain();
+  lfo.frequency.value = freq;
+  lfoGain.gain.value = depth;
+  lfo.connect(lfoGain);
+  lfoGain.connect(param);
+  lfo.start();
+  return lfo;
+}
+
+// ── Station definitions ────────────────────────────────────────────────────
+const STATIONS = {
+  lofi: {
+    name: '🐭 Mouse Radio',
+    callsign: 'WMSE 88.4 FM',
+    tag: 'Lo-Fi Beats for Small Digital Creatures',
+    theme: 'lofi',
+    build(out) {
+      // Chord pad: Cmaj7 area (C, E, G, B)
+      const freqs = [130.81, 164.81, 196.00, 246.94, 261.63, 329.63];
+      const nodes = [];
+      freqs.forEach((f, i) => {
+        const osc = makePad(f, 'sine', (i%2===0)?-3:3);
+        const g = actx.createGain();
+        g.gain.value = 0.04;
+        const lp = actx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 800;
+        // Gentle tremolo
+        makeLFO(0.3 + i*0.02, 8, null, osc.detune);
+        osc.connect(lp); lp.connect(g); g.connect(out);
+        osc.start(); nodes.push(osc, g, lp);
+      });
+      // Vinyl crackle
+      const crackle = makeNoise('pink');
+      const cg = actx.createGain(); cg.gain.value = 0.015;
+      const clf = actx.createBiquadFilter(); clf.type = 'highpass'; clf.frequency.value = 3000;
+      crackle.connect(clf); clf.connect(cg); cg.connect(out);
+      crackle.start(); nodes.push(crackle, cg, clf);
+      return nodes;
+    }
+  },
+  jazz: {
+    name: '☕ Jazz Café',
+    callsign: 'WJAZ 103.7 FM',
+    tag: 'Cool Chords · Warm Nights · Hot Coffee',
+    theme: 'jazz',
+    build(out) {
+      // Dm7 voicing: D F A C (warm jazz chords)
+      const freqs = [146.83, 174.61, 220.00, 261.63, 293.66];
+      const nodes = [];
+      freqs.forEach((f, i) => {
+        const osc = actx.createOscillator();
+        osc.type = i < 2 ? 'sawtooth' : 'sine';
+        osc.frequency.value = f;
+        const g = actx.createGain(); g.gain.value = 0.025;
+        const lp = actx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 1200;
+        lp.Q.value = 2;
+        osc.connect(lp); lp.connect(g); g.connect(out);
+        osc.start(); nodes.push(osc, g, lp);
+      });
+      // Sub bass walk
+      const bass = makePad(73.41, 'triangle');
+      const bg = actx.createGain(); bg.gain.value = 0.09;
+      const blp = actx.createBiquadFilter(); blp.type = 'lowpass'; blp.frequency.value = 300;
+      bass.connect(blp); blp.connect(bg); bg.connect(out);
+      bass.start(); nodes.push(bass, bg, blp);
+      return nodes;
+    }
+  },
+  chill: {
+    name: '❄️ Chill Wave',
+    callsign: 'WCHL 91.1 FM',
+    tag: 'Ambient · Spacious · You Can Exhale Now',
+    theme: 'chill',
+    build(out) {
+      // Sustained pads with slow filter sweep
+      const freqs = [110, 138.59, 164.81, 220, 277.18];
+      const nodes = [];
+      freqs.forEach((f, i) => {
+        const osc = makePad(f, 'sine', i * 7);
+        const g = actx.createGain(); g.gain.value = 0.05;
+        const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600;
+        makeLFO(0.1, 200, null, lp.frequency);
+        osc.connect(lp); lp.connect(g); g.connect(out);
+        osc.start(); nodes.push(osc, g, lp);
+      });
+      // Reverb-feel (noise + resonance)
+      const n = makeNoise('pink');
+      const ng = actx.createGain(); ng.gain.value = 0.008;
+      const nbp = actx.createBiquadFilter(); nbp.type = 'bandpass'; nbp.frequency.value = 500; nbp.Q.value = 0.5;
+      n.connect(nbp); nbp.connect(ng); ng.connect(out);
+      n.start(); nodes.push(n, ng, nbp);
+      return nodes;
+    }
+  },
+  rain: {
+    name: '🌧️ Rain + Music',
+    callsign: 'WRAI 96.5 FM',
+    tag: 'Petrichor Vibes · Cozy Window · Stay In',
+    theme: 'rain',
+    build(out) {
+      // Rain (white noise + shaping)
+      const rain = makeNoise('white');
+      const rg = actx.createGain(); rg.gain.value = 0.12;
+      const rlp = actx.createBiquadFilter(); rlp.type = 'lowpass'; rlp.frequency.value = 1800;
+      rain.connect(rlp); rlp.connect(rg); rg.connect(out);
+      rain.start();
+      // Melody over rain — pentatonic (C D E G A)
+      const penta = [261.63, 293.66, 329.63, 392, 440, 523.25];
+      const nodes = [rain, rg, rlp];
+      penta.forEach((f, i) => {
+        const osc = makePad(f, 'sine', i * 4);
+        const g = actx.createGain(); g.gain.value = 0.03;
+        const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1000;
+        makeLFO(0.2 + i * 0.05, 5, null, osc.detune);
+        osc.connect(lp); lp.connect(g); g.connect(out);
+        osc.start(); nodes.push(osc, g, lp);
+      });
+      return nodes;
+    }
+  },
+  night: {
+    name: '🌸 Late Night FM',
+    callsign: 'WLNT 102.9 FM',
+    tag: '2AM · Soft Synths · You\'re Still Awake',
+    theme: 'night',
+    build(out) {
+      // Dreamy pads — Am chord (A C E G)
+      const freqs = [110, 130.81, 164.81, 196, 220, 261.63];
+      const nodes = [];
+      freqs.forEach((f, i) => {
+        const osc = makePad(f, i % 3 === 0 ? 'triangle' : 'sine', i * 12);
+        const g = actx.createGain(); g.gain.value = 0.04;
+        const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+        const lfo = makeLFO(0.15 + i * 0.03, 10, null, osc.detune);
+        osc.connect(lp); lp.connect(g); g.connect(out);
+        osc.start(); nodes.push(osc, g, lp, lfo);
+      });
+      // Sub rumble
+      const sub = makePad(55, 'sine');
+      const sg = actx.createGain(); sg.gain.value = 0.06;
+      sub.connect(sg); sg.connect(out); sub.start();
+      nodes.push(sub, sg);
+      return nodes;
+    }
+  }
+};
+
+// ── Track lists ─────────────────────────────────────────────────────────────
+const TRACKS = {
+  lofi: [
+    { track: 'Late Night Cheese Run', artist: 'mouse w/ sleepy piano' },
+    { track: 'Homework at 3AM', artist: 'fuzzy blanket collective' },
+    { track: 'Drifting (lo-fi edit)', artist: 'small hours ft. lavender' },
+    { track: 'Bedroom Window Rain', artist: 'mouse 🐭' },
+    { track: 'Golden Hour Crumbs', artist: 'cozy corner records' },
+    { track: 'Nap Mode Activated', artist: 'soft static ensemble' },
+    { track: '✉️ Letters Never Sent', artist: 'mouse feat. dusty keys' },
+  ],
+  jazz: [
+    { track: 'After Hours at the Fromage Bar', artist: 'the cool cats quartet' },
+    { track: 'Mellow Yellow (Bossa Mix)', artist: 'señor whiskers' },
+    { track: 'Midnight Sax Appeal', artist: 'velvet paws trio' },
+    { track: 'Coffee, Solitude, and a View', artist: 'jazzcat ensemble' },
+    { track: 'Autumn in the Tunnel', artist: 'mouse & the mellow horns' },
+  ],
+  chill: [
+    { track: 'Weightless (extended)', artist: 'ambient mouse' },
+    { track: 'Float Protocol', artist: 'negative space records' },
+    { track: 'Exhale Everything', artist: '∞ hz collective' },
+    { track: 'Sunday Afternoon Dissolve', artist: 'soft machine room' },
+    { track: 'Unfocused in the Best Way', artist: 'mouse & the open window' },
+  ],
+  rain: [
+    { track: 'Petrichor (window seat mix)', artist: 'weather mouse' },
+    { track: 'Grey Skies, Warm Blanket', artist: 'umbrella records' },
+    { track: 'Rain on a Tin Roof', artist: 'downpour collective' },
+    { track: 'Cozy Season', artist: 'mouse stays inside' },
+    { track: 'The Street After Rain', artist: 'post-storm ensemble' },
+  ],
+  night: [
+    { track: '2:47 AM', artist: 'late night mouse' },
+    { track: 'You\'re Still Awake (instrumental)', artist: 'small hours' },
+    { track: 'The Last Train Home', artist: 'midnight crew' },
+    { track: 'Soft Light From Nowhere', artist: 'ambient mouse 🌸' },
+    { track: 'Five More Minutes', artist: 'the sleepy collective' },
+  ]
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+let trackIndex = 0;
+let trackProgress = 0;
+let trackDuration = 240; // seconds (fake)
+let progressTimer = null;
+
+function loadTrack(stationId) {
+  const list = TRACKS[stationId];
+  trackIndex = Math.floor(Math.random() * list.length);
+  const t = list[trackIndex];
+  document.getElementById('npTrack').textContent = t.track;
+  document.getElementById('npArtist').textContent = t.artist;
+  trackProgress = Math.random() * 60; // random start point
+  trackDuration = 180 + Math.floor(Math.random() * 120);
+  updateProgressBar();
+}
+
+function nextTrack() {
+  const list = TRACKS[currentStation];
+  trackIndex = (trackIndex + 1) % list.length;
+  const t = list[trackIndex];
+  const el = document.getElementById('npTrack');
+  el.style.opacity = 0;
+  setTimeout(() => {
+    document.getElementById('npTrack').textContent = t.track;
+    document.getElementById('npArtist').textContent = t.artist;
+    el.style.opacity = 1;
+  }, 300);
+  trackProgress = 0;
+  trackDuration = 180 + Math.floor(Math.random() * 120);
+}
+
+function updateProgressBar() {
+  const pct = Math.min(100, (trackProgress / trackDuration) * 100);
+  document.getElementById('npBar').style.width = pct + '%';
+}
+
+function startProgressTimer() {
+  if (progressTimer) clearInterval(progressTimer);
+  progressTimer = setInterval(() => {
+    if (!isPlaying) return;
+    trackProgress++;
+    if (trackProgress >= trackDuration) nextTrack();
+    else updateProgressBar();
+  }, 1000);
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────
+function togglePlay() {
+  initAudio();
+  if (isPlaying) {
+    isPlaying = false;
+    stopAll();
+    document.getElementById('playBtn').textContent = '▶';
+    document.getElementById('playBtn').classList.remove('playing');
+  } else {
+    isPlaying = true;
+    startStation(currentStation);
+    document.getElementById('playBtn').textContent = '⏸';
+    document.getElementById('playBtn').classList.add('playing');
+    startProgressTimer();
+  }
+}
+
+function startStation(id) {
+  stopAll();
+  const s = STATIONS[id];
+  stationNodes = s.build(gainNode);
+}
+
+function switchStation(id) {
+  currentStation = id;
+  const s = STATIONS[id];
+  // Update UI
+  document.getElementById('callsign').textContent = s.callsign;
+  document.getElementById('stationName').textContent = s.name;
+  document.getElementById('stationTag').textContent = s.tag;
+  const card = document.getElementById('radioCard');
+  card.className = 'radio-card theme-' + s.theme;
+  // Update station buttons
+  document.querySelectorAll('.station-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  // Load new track
+  loadTrack(id);
+  // If playing, switch audio
+  if (isPlaying) startStation(id);
+}
+
+document.getElementById('volSlider').addEventListener('input', e => {
+  if (gainNode) gainNode.gain.value = e.target.value / 100;
+});
+
+// ── Visualizer ─────────────────────────────────────────────────────────────
+const vizCanvas = document.getElementById('waveCanvas');
+const vizCtx = vizCanvas.getContext('2d');
+
+function resizeViz() {
+  const container = vizCanvas.parentElement;
+  vizCanvas.width = container.offsetWidth;
+  vizCanvas.height = container.offsetHeight;
+}
+resizeViz();
+window.addEventListener('resize', resizeViz);
+
+// Fake visualizer data when audio off
+let fakePhase = 0;
+const fakeData = new Uint8Array(64).fill(128);
+
+function drawViz() {
+  requestAnimationFrame(drawViz);
+  const W = vizCanvas.width, H = vizCanvas.height;
+  vizCtx.clearRect(0, 0, W, H);
+
+  let data;
+  if (analyser && isPlaying) {
+    data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+  } else {
+    // Fake idle animation
+    fakePhase += 0.05;
+    data = new Uint8Array(64);
+    for (let i = 0; i < 64; i++) {
+      data[i] = isPlaying ? 0 : 
+        20 + 15 * Math.sin(fakePhase + i * 0.3) * Math.sin(fakePhase * 0.3 + i * 0.1);
+    }
+  }
+
+  const card = document.getElementById('radioCard');
+  const theme = card.className.split('theme-')[1];
+  const colors = {
+    lofi: ['#b4a0ff', '#7c5cbf'],
+    jazz: ['#ffb347', '#cc7700'],
+    chill: ['#80d8ff', '#0099cc'],
+    rain: ['#66bb6a', '#2e7d32'],
+    night: ['#ff80bf', '#cc0066'],
+  };
+  const [c1, c2] = colors[theme] || colors.lofi;
+
+  const barW = W / data.length * 1.5;
+  const gap = (W - barW * data.length) / (data.length + 1);
+
+  data.forEach((val, i) => {
+    const barH = (val / 255) * (H * 0.85);
+    const x = gap + i * (barW + gap);
+    const y = H - barH;
+    const grad = vizCtx.createLinearGradient(0, y, 0, H);
+    grad.addColorStop(0, c1);
+    grad.addColorStop(1, c2 + '44');
+    vizCtx.fillStyle = grad;
+    vizCtx.fillRect(x, y, barW, barH);
+    // Glow reflection
+    vizCtx.fillStyle = c1 + '22';
+    vizCtx.fillRect(x, H, barW, -(barH * 0.25));
+  });
+}
+drawViz();
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadTrack('lofi');
+</script>
+</body>
+</html>

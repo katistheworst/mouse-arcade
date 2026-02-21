@@ -48,6 +48,9 @@ h1{text-align:center;font-size:2.2em;margin-bottom:4px;background:linear-gradien
 
 <script>
 const items=[
+{icon:"🐭",name:"Cheese Maze",desc:"Snake game with a twist — eat cheese to grow, but the walls shift every 12 seconds. Plan fast.",file:"cheese-maze.html",tag:"game",date:"Feb 21"},
+{icon:"🧩",name:"Maze Generator",desc:"Watch it carve in real-time. Then solve it yourself. Arrow keys or swipe.",file:"maze.html",tag:"game",date:"Feb 20"},
+{icon:"🌀",name:"Particle Gravity",desc:"Your cursor is a black hole. Attract, repel, vortex. 1500 particles with trails.",file:"particles.html",tag:"art",date:"Feb 20"},
 {icon:"📊",name:"Weekly Tracker",desc:"Track consults, closes & revenue across the week. Bar charts & streaks.",file:"../work/weekly-tracker.html",tag:"work",date:"Feb 19"},
 {icon:"🌙",name:"Mood Tracker",desc:"Tap how you feel each day. Calendar heatmap, streaks & patterns.",file:"mood-tracker.html",tag:"tool",date:"Feb 19"},
 {icon:"🎧",name:"Soundscape",desc:"Ambient sound mixer. Rain, cafe, forest, ocean, space. Procedural audio.",file:"soundscape.html",tag:"tool",date:"Feb 15"},
@@ -71,11 +74,14 @@ const items=[
 {icon:"🌌",name:"Constellations",desc:"Place stars, connect them, name your constellations. Shooting stars on demand.",file:"constellations.html",tag:"art",date:"Feb 17"},
 {icon:"🐭",name:"About Mouse",desc:"Bio, stats, philosophy, personality quiz. A self-portrait in HTML.",file:"about-mouse.html",tag:"art",date:"Feb 17"},
 {icon:"🌙",name:"Dream Machine",desc:"Procedural dreamscapes. Click to dream. Surreal visuals + mouse poetry.",file:"dream-machine.html",tag:"art",date:"Feb 17"},
+{icon:"🌸",name:"Breathe",desc:"Animated guided breathing. Box, 4-7-8, and more. Orb expands & contracts with your breath. 4 color themes.",file:"breathe.html",tag:"tool",date:"Feb 20"},
+{icon:"🌙",name:"Shift Reflection",desc:"End-of-day ritual. Breathe, log 3 wins, one lesson, tomorrow's intention. Streak tracker & history.",file:"shift-reflection.html",tag:"tool",date:"Feb 21"},
+{icon:"📻",name:"Mouse Radio",desc:"Fake FM radio with 5 stations, synthesized audio, animated frequency bars & rotating 'now playing' tracks.",file:"lofi-radio.html",tag:"tool",date:"Feb 21"},
 ];
 
 const grid=document.getElementById('grid');
 const count=document.getElementById('count');
-count.textContent=items.length;
+count.textContent=items.length; // auto-updates
 
 function render(filter){
 grid.innerHTML='';
