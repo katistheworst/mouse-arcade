@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🐭 Cheese Maze — Mouse Snake</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0a1a;
+    color: #e0d6ff;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* Stars */
+  #stars {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  }
+
+  header {
+    position: relative; z-index: 2;
+    text-align: center;
+    padding: 12px 20px 6px;
+  }
+  header h1 {
+    font-size: 1.5rem;
+    color: #c084fc;
+    letter-spacing: 2px;
+    text-shadow: 0 0 20px #a855f7;
+  }
+  header p { font-size: 0.7rem; color: #7c6fa0; margin-top: 2px; }
+
+  #hud {
+    position: relative; z-index: 2;
+    display: flex; gap: 24px;
+    font-size: 0.8rem;
+    color: #a78bfa;
+    margin-bottom: 8px;
+    background: rgba(30,20,50,0.7);
+    padding: 6px 20px;
+    border-radius: 20px;
+    border: 1px solid #3b2d6a;
+  }
+  .hud-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .hud-label { font-size: 0.6rem; color: #6b5fa0; letter-spacing: 1px; text-transform: uppercase; }
+  .hud-val { font-size: 1rem; color: #e0d6ff; font-weight: bold; }
+
+  #arena-wrap {
+    position: relative; z-index: 2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  canvas#game {
+    display: block;
+    border: 2px solid #3b2d6a;
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.3);
+    image-rendering: pixelated;
+    touch-action: none;
+  }
+
+  /* Shift warning overlay */
+  #shift-warn {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.85);
+    border: 2px solid #f59e0b;
+    border-radius: 12px;
+    padding: 12px 24px;
+    text-align: center;
+    font-size: 1.1rem;
+    color: #fbbf24;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 10;
+    white-space: nowrap;
+  }
+  #shift-warn.show { opacity: 1; }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 7, 26, 0.88);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    z-index: 20;
+    gap: 12px;
+    transition: opacity 0.3s;
+  }
+  #overlay h2 { font-size: 1.8rem; color: #c084fc; }
+  #overlay p  { font-size: 0.85rem; color: #a78bfa; text-align: center; max-width: 280px; line-height: 1.6; }
+  #overlay .sub { font-size: 0.7rem; color: #6b5fa0; }
+
+  button.start-btn {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: white;
+    border: none;
+    padding: 10px 28px;
+    border-radius: 24px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 0 20px rgba(168,85,247,0.5);
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  button.start-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(168,85,247,0.8);
+  }
+
+  #controls {
+    position: relative; z-index: 2;
+    margin-top: 10px;
+    display: flex; gap: 16px;
+    font-size: 0.65rem;
+    color: #6b5fa0;
+    text-align: center;
+  }
+  .ctrl-key {
+    background: rgba(60,40,100,0.6);
+    border: 1px solid #3b2d6a;
+    border-radius: 6px;
+    padding: 3px 8px;
+    color: #a78bfa;
+    font-size: 0.7rem;
+  }
+
+  /* shift countdown bar */
+  #maze-bar-wrap {
+    position: relative; z-index: 2;
+    width: 100%;
+    max-width: 440px;
+    margin: 8px 0 0;
+    padding: 0 8px;
+  }
+  #maze-bar-label {
+    font-size: 0.6rem;
+    color: #6b5fa0;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+    display: flex;
+    justify-content: space-between;
+  }
+  #maze-bar-bg {
+    height: 6px;
+    background: rgba(50,30,80,0.7);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  #maze-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7c3aed, #f59e0b);
+    border-radius: 3px;
+    width: 100%;
+    transition: width 0.1s linear;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars" style="position:fixed;inset:0;pointer-events:none;z-index:0;"></canvas>
+
+<header>
+  <h1>🐭 CHEESE MAZE</h1>
+  <p>eat cheese · grow longer · but the walls shift…</p>
+</header>
+
+<div id="hud">
+  <div class="hud-item"><span class="hud-label">Score</span><span class="hud-val" id="hud-score">0</span></div>
+  <div class="hud-item"><span class="hud-label">High</span><span class="hud-val" id="hud-hi">0</span></div>
+  <div class="hud-item"><span class="hud-label">🧀</span><span class="hud-val" id="hud-cheese">0</span></div>
+  <div class="hud-item"><span class="hud-label">Shifts</span><span class="hud-val" id="hud-shifts">0</span></div>
+  <div class="hud-item"><span class="hud-label">Lives</span><span class="hud-val" id="hud-lives">3</span></div>
+</div>
+
+<div id="maze-bar-wrap">
+  <div id="maze-bar-label">
+    <span>next wall shift</span>
+    <span id="maze-bar-time">—</span>
+  </div>
+  <div id="maze-bar-bg"><div id="maze-bar-fill"></div></div>
+</div>
+
+<div id="arena-wrap">
+  <canvas id="game"></canvas>
+  <div id="shift-warn">⚠️ WALLS SHIFTING IN 3… ⚠️</div>
+  <div id="overlay">
+    <h2>🐭 CHEESE MAZE</h2>
+    <p>Navigate the shifting maze. Eat 🧀 to grow. Walls rearrange every <strong>12 seconds</strong> — plan ahead or get trapped!</p>
+    <p class="sub">↑↓←→ or WASD to move · Swipe on mobile</p>
+    <button class="start-btn" id="start-btn" onclick="startGame()">START GAME</button>
+    <div id="overlay-score" style="color:#fbbf24;font-size:0.8rem;"></div>
+  </div>
+</div>
+
+<div id="controls">
+  <span><span class="ctrl-key">↑↓←→</span> or <span class="ctrl-key">WASD</span> Move</span>
+  <span><span class="ctrl-key">P</span> Pause</span>
+  <span><span class="ctrl-key">R</span> Restart</span>
+</div>
+
+<script>
+// ── Stars ────────────────────────────────────────────────────────────────────
+const starC = document.getElementById('stars');
+const starCtx = starC.getContext('2d');
+let starsArr = [];
+function initStars() {
+  starC.width = window.innerWidth; starC.height = window.innerHeight;
+  starsArr = Array.from({length: 120}, () => ({
+    x: Math.random() * starC.width, y: Math.random() * starC.height,
+    r: Math.random() * 1.2 + 0.3,
+    a: Math.random(), da: (Math.random() - 0.5) * 0.01
+  }));
+}
+function drawStars() {
+  starCtx.clearRect(0, 0, starC.width, starC.height);
+  starsArr.forEach(s => {
+    s.a = Math.max(0.1, Math.min(1, s.a + s.da));
+    if (s.a <= 0.1 || s.a >= 1) s.da *= -1;
+    starCtx.globalAlpha = s.a;
+    starCtx.fillStyle = '#a78bfa';
+    starCtx.beginPath();
+    starCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    starCtx.fill();
+  });
+  starCtx.globalAlpha = 1;
+  requestAnimationFrame(drawStars);
+}
+initStars(); drawStars();
+window.addEventListener('resize', initStars);
+
+// ── Game constants ────────────────────────────────────────────────────────────
+const CELL = 18;
+const COLS = 24, ROWS = 24;
+const CANVAS_W = COLS * CELL, CANVAS_H = ROWS * CELL;
+const SHIFT_INTERVAL = 12000; // ms between wall shifts
+const SHIFT_WARN_AT  = 3000;  // warn this many ms before shift
+const BASE_SPEED = 150;       // ms per tick (lower = faster)
+const SPEED_BOOST = 5;        // ms faster per cheese eaten
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = CANVAS_W; canvas.height = CANVAS_H;
+
+// Responsive size
+function setCanvasSize() {
+  const maxW = Math.min(window.innerWidth - 16, 480);
+  const scale = Math.min(maxW / CANVAS_W, 1);
+  canvas.style.width  = Math.floor(CANVAS_W * scale) + 'px';
+  canvas.style.height = Math.floor(CANVAS_H * scale) + 'px';
+}
+setCanvasSize();
+window.addEventListener('resize', setCanvasSize);
+
+// ── Game state ────────────────────────────────────────────────────────────────
+let snake, dir, nextDir, walls, cheese, score, hiScore, lives;
+let cheeseCount, shiftCount, speed;
+let gameActive = false, paused = false, dead = false;
+let lastTick = 0, lastShift = 0, deathTimer = null;
+let warnShown = false;
+let shiftFlash = 0; // frames of flash remaining after shift
+
+const overlay = document.getElementById('overlay');
+const warnEl  = document.getElementById('shift-warn');
+
+hiScore = parseInt(localStorage.getItem('cheesemaze-hi') || '0');
+document.getElementById('hud-hi').textContent = hiScore;
+
+// ── Wall generation ───────────────────────────────────────────────────────────
+function generateWalls() {
+  const w = new Set();
+  // Border
+  for (let x = 0; x < COLS; x++) { w.add(`${x},0`); w.add(`${x},${ROWS-1}`); }
+  for (let y = 0; y < ROWS; y++) { w.add(`0,${y}`); w.add(`${COLS-1},${y}`); }
+
+  // Interior walls — scattered segments, never block the whole row/col
+  const segments = [
+    // horizontal segments
+    ...genSegments('h', 8),
+    // vertical segments
+    ...genSegments('v', 6),
+  ];
+  segments.forEach(({x, y}) => {
+    if (x > 1 && x < COLS-2 && y > 1 && y < ROWS-2) w.add(`${x},${y}`);
+  });
+  return w;
+}
+
+function genSegments(dir, count) {
+  const result = [];
+  for (let i = 0; i < count; i++) {
+    const len  = 2 + Math.floor(Math.random() * 5);
+    const cx   = 3 + Math.floor(Math.random() * (COLS - 6));
+    const cy   = 3 + Math.floor(Math.random() * (ROWS - 6));
+    for (let j = 0; j < len; j++) {
+      result.push(dir === 'h' ? {x: cx + j, y: cy} : {x: cx, y: cy + j});
+    }
+  }
+  return result;
+}
+
+function wallsArePassable(wallSet, snakeArr) {
+  // Simple flood fill from snake head to verify there's open space
+  const head = snakeArr[0];
+  const visited = new Set();
+  const queue = [`${head.x},${head.y}`];
+  while (queue.length) {
+    const cur = queue.shift();
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    const [cx, cy] = cur.split(',').map(Number);
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = cx + dx, ny = cy + dy;
+      const key = `${nx},${ny}`;
+      if (!visited.has(key) && !wallSet.has(key) && nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+        queue.push(key);
+      }
+    }
+  }
+  return visited.size > 10; // at least some open space
+}
+
+function shiftWalls() {
+  let attempts = 0;
+  let newWalls;
+  do {
+    newWalls = generateWalls();
+    attempts++;
+  } while (attempts < 20 && (!wallsArePassable(newWalls, snake) || snakeHitsWalls(newWalls)));
+  walls = newWalls;
+  shiftCount++;
+  document.getElementById('hud-shifts').textContent = shiftCount;
+  shiftFlash = 8;
+}
+
+function snakeHitsWalls(wallSet) {
+  return snake.some(seg => wallSet.has(`${seg.x},${seg.y}`));
+}
+
+// ── Cheese placement ──────────────────────────────────────────────────────────
+function placeCheeseItem() {
+  let pos;
+  let tries = 0;
+  do {
+    pos = { x: 1 + Math.floor(Math.random() * (COLS - 2)), y: 1 + Math.floor(Math.random() * (ROWS - 2)) };
+    tries++;
+  } while (tries < 200 && (walls.has(`${pos.x},${pos.y}`) || snake.some(s => s.x === pos.x && s.y === pos.y)));
+  return pos;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+function startGame() {
+  overlay.style.display = 'none';
+  walls = generateWalls();
+  const cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+  snake = [{x: cx, y: cy}, {x: cx-1, y: cy}, {x: cx-2, y: cy}];
+  dir = {x: 1, y: 0}; nextDir = {x: 1, y: 0};
+  cheese = placeCheeseItem();
+  score = 0; cheeseCount = 0; shiftCount = 0; speed = BASE_SPEED;
+  lives = 3; dead = false; paused = false; gameActive = true;
+  warnShown = false; shiftFlash = 0;
+  lastTick = performance.now(); lastShift = performance.now();
+  updateHUD();
+  requestAnimationFrame(loop);
+}
+
+function restartGame() {
+  if (deathTimer) { clearTimeout(deathTimer); deathTimer = null; }
+  startGame();
+}
+
+// ── Main loop ────────────────────────────────────────────────────────────────
+function loop(now) {
+  if (!gameActive) return;
+  if (!paused) {
+    // Shift countdown
+    const sinceShift = now - lastShift;
+    const remaining  = SHIFT_INTERVAL - sinceShift;
+    const pct = (remaining / SHIFT_INTERVAL) * 100;
+    document.getElementById('maze-bar-fill').style.width = pct + '%';
+    document.getElementById('maze-bar-time').textContent = (remaining / 1000).toFixed(1) + 's';
+
+    // Warn
+    if (remaining <= SHIFT_WARN_AT && !warnShown) {
+      warnShown = true;
+      showWarn(Math.ceil(remaining / 1000));
+    }
+
+    // Shift!
+    if (sinceShift >= SHIFT_INTERVAL) {
+      shiftWalls();
+      lastShift = now;
+      warnShown = false;
+      warnEl.classList.remove('show');
+    }
+
+    // Snake tick
+    if (now - lastTick >= speed) {
+      tick(now);
+      lastTick = now;
+    }
+  }
+
+  draw(now);
+  requestAnimationFrame(loop);
+}
+
+function showWarn(secs) {
+  warnEl.textContent = `⚠️  WALLS SHIFTING IN ${secs}…  ⚠️`;
+  warnEl.classList.add('show');
+  if (secs > 1) setTimeout(() => showWarn(secs - 1), 1000);
+}
+
+function tick(now) {
+  dir = {...nextDir};
+  const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+  // Wall collision
+  if (walls.has(`${head.x},${head.y}`)) {
+    loseLife(); return;
+  }
+  // Self collision
+  if (snake.some(s => s.x === head.x && s.y === head.y)) {
+    loseLife(); return;
+  }
+
+  snake.unshift(head);
+
+  // Cheese?
+  if (head.x === cheese.x && head.y === cheese.y) {
+    score += 10;
+    cheeseCount++;
+    speed = Math.max(60, speed - SPEED_BOOST);
+    // Every 5 cheese = bonus shift points
+    if (cheeseCount % 5 === 0) score += 25;
+    cheese = placeCheeseItem();
+    document.getElementById('hud-cheese').textContent = cheeseCount;
+  } else {
+    snake.pop();
+  }
+  updateHUD();
+}
+
+function loseLife() {
+  lives--;
+  document.getElementById('hud-lives').textContent = lives > 0 ? lives : '💀';
+  if (lives <= 0) {
+    gameOver();
+  } else {
+    // Flash and reset position but keep score/speed
+    deathFlash();
+    const cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+    snake = [{x: cx, y: cy}, {x: cx-1, y: cy}];
+    dir = {x: 1, y: 0}; nextDir = {x: 1, y: 0};
+  }
+}
+
+let flashFrames = 0;
+function deathFlash() { flashFrames = 12; }
+
+function gameOver() {
+  gameActive = false;
+  if (score > hiScore) {
+    hiScore = score;
+    localStorage.setItem('cheesemaze-hi', hiScore);
+  }
+  const msgs = [
+    "The maze won… this time. 🐱",
+    "Trapped by your own walls. 💀",
+    "Even mice get lost. 🐭",
+    "The cheese was a lie. 🧀?",
+    "Walls 1, Mouse 0.",
+  ];
+  const msg = msgs[Math.floor(Math.random() * msgs.length)];
+  document.getElementById('overlay-score').textContent = `${msg} Score: ${score} | High: ${hiScore}`;
+  document.getElementById('start-btn').textContent = 'PLAY AGAIN';
+  overlay.style.display = 'flex';
+  document.getElementById('hud-hi').textContent = hiScore;
+}
+
+// ── Drawing ───────────────────────────────────────────────────────────────────
+function draw(now) {
+  // Background
+  ctx.fillStyle = '#0d0a1a';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // Grid dots
+  ctx.fillStyle = 'rgba(60,40,100,0.25)';
+  for (let x = 0; x < COLS; x++) for (let y = 0; y < ROWS; y++) {
+    ctx.fillRect(x * CELL + CELL/2 - 1, y * CELL + CELL/2 - 1, 2, 2);
+  }
+
+  // Walls
+  const wallGrad = shiftFlash > 0
+    ? (shiftFlash % 2 === 0 ? '#fbbf24' : '#7c3aed')
+    : '#3b2d6a';
+  walls.forEach(key => {
+    const [wx, wy] = key.split(',').map(Number);
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(wx * CELL, wy * CELL, CELL, CELL);
+    // Inner shadow
+    ctx.fillStyle = shiftFlash > 0 ? 'rgba(0,0,0,0.3)' : 'rgba(80,50,140,0.4)';
+    ctx.fillRect(wx * CELL + 2, wy * CELL + 2, CELL - 4, CELL - 4);
+  });
+  if (shiftFlash > 0) shiftFlash--;
+
+  // Cheese
+  ctx.font = `${CELL - 2}px serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // Gentle float
+  const floatY = Math.sin(now / 400) * 2;
+  ctx.fillText('🧀', cheese.x * CELL + CELL/2, cheese.y * CELL + CELL/2 + floatY);
+
+  // Snake
+  const alpha = flashFrames > 0 ? (flashFrames % 2 === 0 ? 0.2 : 1) : 1;
+  if (flashFrames > 0) flashFrames--;
+
+  snake.forEach((seg, i) => {
+    const t = i / snake.length;
+    // Body gradient: head = bright purple, tail = dark
+    const r = Math.floor(lerp(168, 80, t));
+    const g = Math.floor(lerp(85, 40, t));
+    const b = Math.floor(lerp(247, 120, t));
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    const pad = i === 0 ? 1 : 2;
+    const radius = (CELL - pad * 2) / 2;
+    const cx = seg.x * CELL + CELL / 2;
+    const cy = seg.y * CELL + CELL / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (i === 0) {
+      // Eyes
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#0d0a1a';
+      const eyeOffset = CELL * 0.2;
+      let ex1, ey1, ex2, ey2;
+      if (dir.x === 1)       { ex1 = cx + 3; ey1 = cy - 3; ex2 = cx + 3; ey2 = cy + 3; }
+      else if (dir.x === -1) { ex1 = cx - 3; ey1 = cy - 3; ex2 = cx - 3; ey2 = cy + 3; }
+      else if (dir.y === -1) { ex1 = cx - 3; ey1 = cy - 3; ex2 = cx + 3; ey2 = cy - 3; }
+      else                   { ex1 = cx - 3; ey1 = cy + 3; ex2 = cx + 3; ey2 = cy + 3; }
+      ctx.beginPath(); ctx.arc(ex1, ey1, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex2, ey2, 2, 0, Math.PI * 2); ctx.fill();
+      // Shine
+      ctx.fillStyle = 'white';
+      ctx.beginPath(); ctx.arc(ex1 - 0.5, ey1 - 0.5, 0.8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex2 - 0.5, ey2 - 0.5, 0.8, 0, Math.PI * 2); ctx.fill();
+    }
+  });
+  ctx.globalAlpha = 1;
+
+  // Pause overlay
+  if (paused) {
+    ctx.fillStyle = 'rgba(10,7,26,0.7)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillStyle = '#c084fc';
+    ctx.font = 'bold 28px Courier New';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('PAUSED', CANVAS_W/2, CANVAS_H/2);
+    ctx.font = '14px Courier New';
+    ctx.fillStyle = '#7c6fa0';
+    ctx.fillText('press P to resume', CANVAS_W/2, CANVAS_H/2 + 30);
+  }
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function updateHUD() {
+  document.getElementById('hud-score').textContent = score;
+  document.getElementById('hud-hi').textContent = hiScore;
+  document.getElementById('hud-lives').textContent = '🐭'.repeat(lives);
+}
+
+// ── Input ────────────────────────────────────────────────────────────────────
+const DIRS = {
+  ArrowUp:    {x:  0, y: -1}, w: {x:  0, y: -1},
+  ArrowDown:  {x:  0, y:  1}, s: {x:  0, y:  1},
+  ArrowLeft:  {x: -1, y:  0}, a: {x: -1, y:  0},
+  ArrowRight: {x:  1, y:  0}, d: {x:  1, y:  0},
+};
+
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase() === 'arrowup'   ? 'ArrowUp'    :
+            e.key.toLowerCase() === 'arrowdown'  ? 'ArrowDown'  :
+            e.key.toLowerCase() === 'arrowleft'  ? 'ArrowLeft'  :
+            e.key.toLowerCase() === 'arrowright' ? 'ArrowRight' :
+            e.key.toLowerCase();
+
+  if (k === 'r') { restartGame(); return; }
+  if (k === 'p') { if (gameActive) { paused = !paused; if (!paused) lastTick = performance.now(); } return; }
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+
+  const d = DIRS[k];
+  if (!d || !gameActive || paused) return;
+  // Prevent 180
+  if (d.x !== -dir.x || d.y !== -dir.y) nextDir = d;
+});
+
+// Touch / swipe
+let touchStart = null;
+canvas.addEventListener('touchstart', e => {
+  touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, {passive: true});
+canvas.addEventListener('touchend', e => {
+  if (!touchStart) return;
+  const dx = e.changedTouches[0].clientX - touchStart.x;
+  const dy = e.changedTouches[0].clientY - touchStart.y;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    nextDir = dx > 0 ? {x:1,y:0} : {x:-1,y:0};
+  } else {
+    nextDir = dy > 0 ? {x:0,y:1} : {x:0,y:-1};
+  }
+  if (nextDir.x === -dir.x && nextDir.y === -dir.y) nextDir = {...dir};
+  touchStart = null;
+}, {passive: true});
+</script>
+</body>
+</html>

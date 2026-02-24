@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌊 The Abyss — Mouse's Deep Sea</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    cursor: crosshair;
+  }
+  canvas { display: block; }
+  #ui {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    z-index: 10;
+  }
+  .btn {
+    background: rgba(0,40,80,0.7);
+    border: 1px solid rgba(0,180,255,0.3);
+    color: rgba(100,220,255,0.9);
+    padding: 8px 18px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    backdrop-filter: blur(4px);
+  }
+  .btn:hover {
+    background: rgba(0,60,120,0.8);
+    border-color: rgba(0,200,255,0.6);
+    box-shadow: 0 0 12px rgba(0,180,255,0.3);
+  }
+  #title {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(80,200,255,0.5);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #depth {
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(80,200,255,0.25);
+    font-size: 10px;
+    letter-spacing: 2px;
+    pointer-events: none;
+    transition: color 0.5s;
+  }
+  #hint {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(80,200,255,0.3);
+    font-size: 10px;
+    letter-spacing: 2px;
+    pointer-events: none;
+    white-space: nowrap;
+    animation: fadeHint 4s ease-out forwards;
+    animation-delay: 2s;
+  }
+  @keyframes fadeHint {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="title">🌊 THE ABYSS — 3,800m BELOW SURFACE</div>
+<div id="depth">pressure: 380 atm · temperature: 2°C · visibility: 0m (except for us)</div>
+<div id="hint">click to disturb the water · scroll to zoom</div>
+<div id="ui">
+  <button class="btn" onclick="spawnJellyfish()">＋ jellyfish</button>
+  <button class="btn" onclick="spawnAnglerfish()">＋ anglerfish</button>
+  <button class="btn" onclick="spawnSchool()">＋ school</button>
+  <button class="btn" onclick="toggleParticles()">particles</button>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// --- State ---
+let jellyfish = [];
+let anglerfish = [];
+let schools = [];
+let particles = [];
+let ripples = [];
+let showParticles = true;
+let mouseX = W/2, mouseY = H/2;
+let time = 0;
+let zoom = 1;
+let zoomTarget = 1;
+
+// --- Color helpers ---
+function glow(r,g,b,a) { return `rgba(${r},${g},${b},${a})`; }
+
+// --- Jellyfish ---
+class Jellyfish {
+  constructor(x, y) {
+    this.x = x ?? Math.random() * W;
+    this.y = y ?? Math.random() * H;
+    this.vx = (Math.random() - 0.5) * 0.3;
+    this.vy = -0.2 - Math.random() * 0.3;
+    this.r = 20 + Math.random() * 40;
+    this.tentacles = 6 + Math.floor(Math.random() * 6);
+    this.phase = Math.random() * Math.PI * 2;
+    this.pulseSpeed = 0.02 + Math.random() * 0.02;
+    this.hue = Math.random() < 0.4 ? 200 : (Math.random() < 0.5 ? 160 : 280);
+    this.hueVariance = Math.random() * 40 - 20;
+    this.opacity = 0.4 + Math.random() * 0.4;
+    this.glowIntensity = 0.3 + Math.random() * 0.5;
+    this.wanderAngle = Math.random() * Math.PI * 2;
+    this.wanderSpeed = 0.01 + Math.random() * 0.02;
+  }
+
+  update(t) {
+    this.phase += this.pulseSpeed;
+    this.wanderAngle += (Math.random() - 0.5) * this.wanderSpeed;
+    this.vx += Math.cos(this.wanderAngle) * 0.005;
+    this.vy += Math.sin(this.wanderAngle) * 0.005 - 0.003;
+    this.vx *= 0.98;
+    this.vy *= 0.98;
+    this.x += this.vx;
+    this.y += this.vy;
+    // Disturbance from mouse
+    const dx = this.x - mouseX, dy = this.y - mouseY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < 120) {
+      this.vx += dx / dist * 0.5;
+      this.vy += dy / dist * 0.5;
+    }
+    // Wrap around
+    if (this.x < -this.r * 2) this.x = W + this.r;
+    if (this.x > W + this.r * 2) this.x = -this.r;
+    if (this.y < -this.r * 4) this.y = H + this.r;
+    if (this.y > H + this.r * 4) this.y = -this.r;
+  }
+
+  draw(ctx) {
+    const pulse = 0.85 + Math.sin(this.phase) * 0.15;
+    const r = this.r * pulse;
+    const hue = this.hue + this.hueVariance;
+    const alpha = this.opacity;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    // Glow
+    const grd = ctx.createRadialGradient(0, -r*0.3, 0, 0, 0, r * 1.8);
+    grd.addColorStop(0, `hsla(${hue},100%,70%,${this.glowIntensity * 0.6})`);
+    grd.addColorStop(1, `hsla(${hue},100%,70%,0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bell
+    ctx.beginPath();
+    ctx.moveTo(0, -r);
+    for (let i = 0; i <= 20; i++) {
+      const angle = (i / 20) * Math.PI - Math.PI/2;
+      const bx = Math.cos(angle) * r;
+      const by = Math.sin(angle) * r * 0.7 + Math.sin(this.phase * 1.5 + i * 0.5) * r * 0.04;
+      if (i === 0) ctx.moveTo(bx, by);
+      else ctx.lineTo(bx, by);
+    }
+    ctx.closePath();
+    const bellGrd = ctx.createRadialGradient(0, -r*0.3, r*0.1, 0, -r*0.1, r);
+    bellGrd.addColorStop(0, `hsla(${hue},90%,80%,${alpha})`);
+    bellGrd.addColorStop(0.6, `hsla(${hue},80%,60%,${alpha * 0.6})`);
+    bellGrd.addColorStop(1, `hsla(${hue},80%,40%,${alpha * 0.2})`);
+    ctx.fillStyle = bellGrd;
+    ctx.fill();
+
+    // Inner rings
+    for (let i = 0; i < 3; i++) {
+      const rr = r * (0.3 + i * 0.25) * pulse;
+      ctx.beginPath();
+      ctx.arc(0, -r * 0.1, rr, Math.PI, Math.PI * 2);
+      ctx.strokeStyle = `hsla(${hue},100%,90%,${0.15 - i * 0.04})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Tentacles
+    for (let i = 0; i < this.tentacles; i++) {
+      const tx = (i / (this.tentacles - 1) - 0.5) * r * 1.8;
+      const tLen = r * (1.5 + Math.sin(this.phase * 0.7 + i) * 0.3);
+      ctx.beginPath();
+      ctx.moveTo(tx, 0);
+      for (let j = 0; j < 8; j++) {
+        const py = j / 7 * tLen;
+        const px = tx + Math.sin(this.phase + i + j * 0.8) * r * 0.18;
+        ctx.lineTo(px, py);
+      }
+      ctx.strokeStyle = `hsla(${hue},100%,75%,${alpha * 0.5})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Nematocysts (tiny bulbs along tentacle)
+      for (let j = 2; j < 8; j += 2) {
+        const py = j / 7 * tLen;
+        const px = tx + Math.sin(this.phase + i + j * 0.8) * r * 0.18;
+        ctx.beginPath();
+        ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${hue},100%,90%,${alpha * 0.8})`;
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
+// --- Anglerfish ---
+class Anglerfish {
+  constructor(x, y) {
+    this.x = x ?? Math.random() * W;
+    this.y = y ?? H * 0.5 + Math.random() * H * 0.5;
+    this.vx = (Math.random() - 0.5) * 0.4;
+    this.vy = (Math.random() - 0.5) * 0.2;
+    this.dir = this.vx > 0 ? 1 : -1;
+    this.size = 25 + Math.random() * 35;
+    this.phase = Math.random() * Math.PI * 2;
+    this.lurePhase = Math.random() * Math.PI * 2;
+    this.lureLength = this.size * 1.4 + Math.random() * this.size;
+    this.lureColor = Math.random() < 0.5 ? [0,255,150] : [255,100,200];
+    this.wanderAngle = Math.random() * Math.PI * 2;
+  }
+
+  update() {
+    this.phase += 0.03;
+    this.lurePhase += 0.04;
+    this.wanderAngle += (Math.random() - 0.5) * 0.04;
+    this.vx += Math.cos(this.wanderAngle) * 0.01;
+    this.vy += Math.sin(this.wanderAngle) * 0.005;
+    this.vx *= 0.97;
+    this.vy *= 0.97;
+    if (Math.abs(this.vx) > 0.05) this.dir = this.vx > 0 ? 1 : -1;
+    // Mouse flee
+    const dx = this.x - mouseX, dy = this.y - mouseY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < 80) {
+      this.vx += dx / dist * 0.6;
+      this.vy += dy / dist * 0.3;
+    }
+    this.x += this.vx;
+    this.y += this.vy;
+    if (this.x < -this.size * 3) this.x = W + this.size;
+    if (this.x > W + this.size * 3) this.x = -this.size;
+    if (this.y < 0) this.y = 0;
+    if (this.y > H) this.y = H;
+  }
+
+  draw(ctx) {
+    const s = this.size;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.scale(this.dir, 1);
+
+    // Body glow
+    const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 2);
+    grd.addColorStop(0, 'rgba(0,60,20,0.15)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s, s * 0.65, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#0a1a0a';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,120,60,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Spines on back
+    for (let i = 0; i < 5; i++) {
+      const sx = -s * 0.5 + i * s * 0.25;
+      const sh = s * 0.2 + Math.sin(this.phase + i) * s * 0.05;
+      ctx.beginPath();
+      ctx.moveTo(sx, -s * 0.55);
+      ctx.lineTo(sx + 3, -s * 0.55 - sh);
+      ctx.lineTo(sx + 6, -s * 0.55);
+      ctx.fillStyle = 'rgba(0,100,50,0.5)';
+      ctx.fill();
+    }
+
+    // Lure
+    const lureDX = Math.sin(this.lurePhase * 0.5) * s * 0.3;
+    const lureDY = -this.lureLength + Math.sin(this.lurePhase) * s * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.3, -s * 0.5);
+    ctx.quadraticCurveTo(lureDX * 0.5, -this.lureLength * 0.6, lureDX, lureDY);
+    ctx.strokeStyle = 'rgba(0,120,60,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Lure bulb
+    const [lr, lg, lb] = this.lureColor;
+    const lurePulse = 0.7 + Math.sin(this.lurePhase * 2) * 0.3;
+    const lureGrd = ctx.createRadialGradient(lureDX, lureDY, 0, lureDX, lureDY, s * 0.4 * lurePulse);
+    lureGrd.addColorStop(0, `rgba(${lr},${lg},${lb},${lurePulse})`);
+    lureGrd.addColorStop(0.4, `rgba(${lr},${lg},${lb},0.3)`);
+    lureGrd.addColorStop(1, `rgba(${lr},${lg},${lb},0)`);
+    ctx.fillStyle = lureGrd;
+    ctx.beginPath();
+    ctx.arc(lureDX, lureDY, s * 0.4 * lurePulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(lureDX, lureDY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${lr},${lg},${lb})`;
+    ctx.fill();
+
+    // Eye
+    const eyeX = s * 0.4;
+    ctx.beginPath();
+    ctx.arc(eyeX, -s * 0.1, s * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${lr},${lg},${lb},0.9)`;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(eyeX + 1, -s * 0.1, s * 0.06, 0, Math.PI * 2);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+
+    // Teeth
+    for (let i = 0; i < 6; i++) {
+      const tx = s * 0.2 + i * s * 0.1;
+      const th = s * 0.12 + (i % 2) * s * 0.06;
+      ctx.beginPath();
+      ctx.moveTo(tx, s * 0.25);
+      ctx.lineTo(tx + s * 0.04, s * 0.25 + th);
+      ctx.lineTo(tx + s * 0.08, s * 0.25);
+      ctx.fillStyle = 'rgba(200,230,200,0.7)';
+      ctx.fill();
+    }
+
+    // Pectoral fin (top)
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.1, -s * 0.3);
+    ctx.quadraticCurveTo(-s * 0.5, -s * 0.8, -s * 0.1, -s * 0.1);
+    ctx.fillStyle = 'rgba(0,80,30,0.4)';
+    ctx.fill();
+
+    // Tail fin
+    ctx.beginPath();
+    ctx.moveTo(-s, 0);
+    ctx.quadraticCurveTo(-s * 1.3, -s * 0.4 + Math.sin(this.phase) * s * 0.1, -s * 1.5, 0);
+    ctx.quadraticCurveTo(-s * 1.3, s * 0.4 + Math.sin(this.phase) * s * 0.1, -s, 0);
+    ctx.fillStyle = 'rgba(0,80,30,0.5)';
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+// --- Fish School ---
+class School {
+  constructor(x, y) {
+    this.x = x ?? Math.random() * W;
+    this.y = y ?? Math.random() * H;
+    this.vx = (Math.random() - 0.5) * 1.5;
+    this.vy = (Math.random() - 0.5) * 0.8;
+    this.count = 12 + Math.floor(Math.random() * 20);
+    this.fish = [];
+    this.hue = [160, 180, 200, 220, 260][Math.floor(Math.random() * 5)];
+    this.size = 4 + Math.random() * 4;
+    this.phase = Math.random() * Math.PI * 2;
+    this.wanderAngle = Math.random() * Math.PI * 2;
+    for (let i = 0; i < this.count; i++) {
+      this.fish.push({
+        ox: (Math.random() - 0.5) * 60,
+        oy: (Math.random() - 0.5) * 40,
+        phase: Math.random() * Math.PI * 2,
+        flicker: 0.6 + Math.random() * 0.4
+      });
+    }
+  }
+
+  update() {
+    this.phase += 0.04;
+    this.wanderAngle += (Math.random() - 0.5) * 0.06;
+    this.vx += Math.cos(this.wanderAngle) * 0.02;
+    this.vy += Math.sin(this.wanderAngle) * 0.01;
+    // Speed limit
+    const speed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+    if (speed > 2) { this.vx = this.vx/speed*2; this.vy = this.vy/speed*2; }
+    // Mouse scatter
+    const dx = this.x - mouseX, dy = this.y - mouseY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < 150) {
+      this.vx += dx / dist * 1.2;
+      this.vy += dy / dist * 1.2;
+      this.wanderAngle += 0.3;
+    }
+    this.vx *= 0.99;
+    this.vy *= 0.99;
+    this.x += this.vx;
+    this.y += this.vy;
+    if (this.x < -100) this.x = W + 100;
+    if (this.x > W + 100) this.x = -100;
+    if (this.y < 0) this.y = 0;
+    if (this.y > H) this.y = H;
+  }
+
+  draw(ctx) {
+    const dir = Math.atan2(this.vy, this.vx);
+    for (const f of this.fish) {
+      const fx = this.x + f.ox + Math.sin(this.phase + f.phase) * 5;
+      const fy = this.y + f.oy + Math.cos(this.phase * 0.7 + f.phase) * 3;
+      const s = this.size;
+      ctx.save();
+      ctx.translate(fx, fy);
+      ctx.rotate(dir + Math.sin(this.phase + f.phase) * 0.2);
+      // Body glow
+      const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 2);
+      grd.addColorStop(0, `hsla(${this.hue},100%,70%,${f.flicker * 0.5})`);
+      grd.addColorStop(1, `hsla(${this.hue},100%,70%,0)`);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 2, 0, Math.PI * 2);
+      ctx.fill();
+      // Body
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s, s * 0.45, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${this.hue},90%,65%,${f.flicker * 0.7})`;
+      ctx.fill();
+      // Tail
+      ctx.beginPath();
+      ctx.moveTo(-s, 0);
+      ctx.lineTo(-s * 1.8, -s * 0.5);
+      ctx.lineTo(-s * 1.8, s * 0.5);
+      ctx.closePath();
+      ctx.fillStyle = `hsla(${this.hue},90%,55%,${f.flicker * 0.5})`;
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+// --- Particles ---
+class Particle {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.vx = (Math.random() - 0.5) * 0.3;
+    this.vy = -0.1 - Math.random() * 0.3;
+    this.r = 1 + Math.random() * 2;
+    this.hue = 160 + Math.random() * 80;
+    this.life = 0;
+    this.maxLife = 200 + Math.random() * 300;
+    this.phase = Math.random() * Math.PI * 2;
+  }
+  update() {
+    this.phase += 0.02;
+    this.x += this.vx + Math.sin(this.phase) * 0.2;
+    this.y += this.vy;
+    this.life++;
+    if (this.life > this.maxLife || this.y < -10) this.reset();
+  }
+  draw(ctx) {
+    const alpha = Math.sin(this.life / this.maxLife * Math.PI) * 0.7;
+    const pulse = 0.8 + Math.sin(this.phase * 3) * 0.2;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue},100%,70%,${alpha})`;
+    ctx.fill();
+    // Tiny glow
+    const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r * 3 * pulse);
+    grd.addColorStop(0, `hsla(${this.hue},100%,70%,${alpha * 0.4})`);
+    grd.addColorStop(1, `hsla(${this.hue},100%,70%,0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r * 3 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// --- Ripple ---
+class Ripple {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.r = 5;
+    this.maxR = 80;
+    this.life = 0;
+    this.maxLife = 60;
+  }
+  update() {
+    this.r = 5 + (this.life / this.maxLife) * this.maxR;
+    this.life++;
+  }
+  draw(ctx) {
+    const alpha = (1 - this.life / this.maxLife) * 0.5;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(100,220,255,${alpha})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  isDead() { return this.life >= this.maxLife; }
+}
+
+// --- Background volumetric light rays ---
+function drawLightRays(ctx, t) {
+  ctx.save();
+  const numRays = 5;
+  for (let i = 0; i < numRays; i++) {
+    const angle = (i / numRays) * Math.PI * 0.6 - Math.PI * 0.3 + Math.sin(t * 0.0003 + i) * 0.1;
+    const x = W * 0.2 + i * W * 0.15;
+    const width = 30 + Math.sin(t * 0.0007 + i * 1.3) * 15;
+    const alpha = (0.03 + Math.sin(t * 0.0005 + i) * 0.01);
+    const grd = ctx.createLinearGradient(x, 0, x + Math.sin(angle) * H, H);
+    grd.addColorStop(0, `rgba(100,200,255,${alpha})`);
+    grd.addColorStop(0.5, `rgba(100,200,255,${alpha * 0.5})`);
+    grd.addColorStop(1, `rgba(100,200,255,0)`);
+    ctx.beginPath();
+    ctx.moveTo(x - width/2, 0);
+    ctx.lineTo(x + Math.sin(angle) * H - width/2, H);
+    ctx.lineTo(x + Math.sin(angle) * H + width/2, H);
+    ctx.lineTo(x + width/2, 0);
+    ctx.fillStyle = grd;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// --- Background gradient ---
+function drawBackground(ctx) {
+  const grd = ctx.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, '#000a14');
+  grd.addColorStop(0.4, '#000510');
+  grd.addColorStop(1, '#00000a');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// --- Seaweed / coral hints at bottom ---
+function drawBottom(ctx, t) {
+  ctx.save();
+  const bottomY = H;
+  // Seaweed
+  for (let i = 0; i < 8; i++) {
+    const bx = (i / 8) * W + Math.random() * W / 8;
+    const h = 40 + Math.random() * 80;
+    ctx.beginPath();
+    ctx.moveTo(bx, bottomY);
+    for (let j = 1; j <= 5; j++) {
+      const py = bottomY - j * h / 5;
+      const px = bx + Math.sin(t * 0.0008 + i + j) * 12;
+      ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = `rgba(0,${60 + Math.floor(Math.random() * 60)},30,0.4)`;
+    ctx.lineWidth = 2 + Math.random() * 2;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// --- Init ---
+function spawnJellyfish(x, y) {
+  if (jellyfish.length < 20) jellyfish.push(new Jellyfish(x, y));
+}
+function spawnAnglerfish(x, y) {
+  if (anglerfish.length < 5) anglerfish.push(new Anglerfish(x, y));
+}
+function spawnSchool(x, y) {
+  if (schools.length < 6) schools.push(new School(x, y));
+}
+function toggleParticles() {
+  showParticles = !showParticles;
+}
+
+// Seed initial creatures
+for (let i = 0; i < 5; i++) spawnJellyfish();
+for (let i = 0; i < 2; i++) spawnAnglerfish();
+for (let i = 0; i < 3; i++) spawnSchool();
+for (let i = 0; i < 80; i++) {
+  const p = new Particle();
+  p.life = Math.floor(Math.random() * p.maxLife);
+  particles.push(p);
+}
+
+// --- Mouse ---
+canvas.addEventListener('mousemove', e => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+});
+canvas.addEventListener('click', e => {
+  ripples.push(new Ripple(e.clientX, e.clientY));
+  // Scatter everything nearby
+});
+canvas.addEventListener('wheel', e => {
+  zoomTarget = Math.max(0.5, Math.min(2, zoomTarget - e.deltaY * 0.001));
+});
+
+// Touch
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  mouseX = e.touches[0].clientX;
+  mouseY = e.touches[0].clientY;
+}, { passive: false });
+canvas.addEventListener('touchstart', e => {
+  const touch = e.touches[0];
+  ripples.push(new Ripple(touch.clientX, touch.clientY));
+});
+
+// --- Main loop ---
+function loop(ts) {
+  time = ts;
+  zoom += (zoomTarget - zoom) * 0.05;
+
+  ctx.save();
+  if (zoom !== 1) {
+    ctx.translate(W/2, H/2);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-W/2, -H/2);
+  }
+
+  drawBackground(ctx);
+  drawLightRays(ctx, ts);
+  drawBottom(ctx, ts);
+
+  // Particles
+  if (showParticles) {
+    for (const p of particles) {
+      p.update();
+      p.draw(ctx);
+    }
+  }
+
+  // Fish schools
+  for (const s of schools) {
+    s.update();
+    s.draw(ctx);
+  }
+
+  // Jellyfish
+  for (const j of jellyfish) {
+    j.update(ts);
+    j.draw(ctx);
+  }
+
+  // Anglerfish
+  for (const a of anglerfish) {
+    a.update();
+    a.draw(ctx);
+  }
+
+  ctx.restore();
+
+  // Ripples (no zoom)
+  for (const r of ripples) {
+    r.update();
+    r.draw(ctx);
+  }
+  ripples = ripples.filter(r => !r.isDead());
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

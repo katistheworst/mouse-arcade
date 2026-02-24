@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌀 Mouse's Maze — Carve & Solve</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0d0010;
+    color: #e0d0ff;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+    gap: 12px;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    color: #c084fc;
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 20px #7c3aed88;
+  }
+
+  h1 span { font-size: 1.5rem; }
+
+  #status-bar {
+    font-size: 0.85rem;
+    color: #a78bfa;
+    height: 1.2em;
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+
+  canvas {
+    border: 2px solid #4c1d95;
+    border-radius: 8px;
+    box-shadow: 0 0 40px #7c3aed44, 0 0 80px #4c1d9522;
+    cursor: crosshair;
+    max-width: 100%;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+  }
+
+  button {
+    background: #1e0533;
+    color: #c084fc;
+    border: 1px solid #6d28d9;
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.03em;
+  }
+
+  button:hover { background: #2d0a52; box-shadow: 0 0 8px #7c3aed66; }
+  button.active { background: #5b21b6; color: #fff; border-color: #a78bfa; }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  select {
+    background: #1e0533;
+    color: #c084fc;
+    border: 1px solid #6d28d9;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+
+  .size-label {
+    color: #7c3aed;
+    font-size: 0.8rem;
+    align-self: center;
+  }
+
+  #help {
+    font-size: 0.75rem;
+    color: #6d28d9;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  #win-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #0d001099;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  #win-overlay.show { display: flex; }
+
+  #win-box {
+    background: #1e0533;
+    border: 2px solid #a78bfa;
+    border-radius: 16px;
+    padding: 32px 40px;
+    text-align: center;
+    box-shadow: 0 0 60px #7c3aed88;
+    animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  #win-box h2 { font-size: 2rem; color: #f0abfc; margin-bottom: 8px; }
+  #win-box p { color: #a78bfa; margin-bottom: 20px; }
+  #win-box button { font-size: 0.95rem; padding: 10px 24px; }
+
+  .speed-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: #7c3aed;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 80px;
+    height: 4px;
+    background: #3b0764;
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #a78bfa;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h1><span>🌀</span> Mouse's Maze</h1>
+<div id="status-bar">Press Generate to begin.</div>
+
+<canvas id="maze"></canvas>
+
+<div class="controls">
+  <span class="size-label">Size:</span>
+  <select id="size-select">
+    <option value="15">Small (15×15)</option>
+    <option value="25" selected>Medium (25×25)</option>
+    <option value="35">Large (35×35)</option>
+    <option value="45">XL (45×45)</option>
+  </select>
+
+  <button id="gen-btn">⚙️ Generate</button>
+  <button id="solve-btn" disabled>🤖 Show Solution</button>
+  <button id="reset-btn" disabled>🔄 Reset Player</button>
+
+  <div class="speed-row">
+    🐌
+    <input type="range" id="speed" min="1" max="100" value="60">
+    🐇
+  </div>
+</div>
+
+<div id="help">
+  Arrow keys or WASD to move · Touch: swipe to navigate<br>
+  Find your way from 🐭 (top-left) to 🧀 (bottom-right)
+</div>
+
+<div id="win-overlay">
+  <div id="win-box">
+    <h2>🧀 CHEESE ACQUIRED!</h2>
+    <p id="win-msg">You solved it! A mouse always finds the cheese.</p>
+    <button id="win-new">New Maze ⚙️</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('maze');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status-bar');
+const genBtn = document.getElementById('gen-btn');
+const solveBtn = document.getElementById('solve-btn');
+const resetBtn = document.getElementById('reset-btn');
+const speedSlider = document.getElementById('speed');
+const sizeSelect = document.getElementById('size-select');
+const winOverlay = document.getElementById('win-overlay');
+const winMsg = document.getElementById('win-msg');
+document.getElementById('win-new').onclick = () => { winOverlay.classList.remove('show'); startGen(); };
+
+// Maze state
+let COLS, ROWS, CELL;
+let grid = [];         // flat array of cells
+let generating = false;
+let solved = false;
+let solutionPath = [];
+let showSolution = false;
+
+let player = { x: 0, y: 0 };
+let visited = new Set(); // cells player has stepped on
+let playerActive = false;
+
+// Touch tracking
+let touchStart = null;
+
+// ── Cell structure ──────────────────────────────────────────────────────────
+// walls: { N, S, E, W } = true (wall present) / false (passage)
+function makeCell(x, y) {
+  return { x, y, walls: { N: true, S: true, E: true, W: true }, visited: false };
+}
+
+function idx(x, y) { return y * COLS + x; }
+function cell(x, y) { return grid[idx(x, y)]; }
+
+function neighbors(c) {
+  const ns = [];
+  if (c.y > 0)      ns.push({ dir: 'N', cell: cell(c.x, c.y - 1) });
+  if (c.y < ROWS-1) ns.push({ dir: 'S', cell: cell(c.x, c.y + 1) });
+  if (c.x < COLS-1) ns.push({ dir: 'E', cell: cell(c.x + 1, c.y) });
+  if (c.x > 0)      ns.push({ dir: 'W', cell: cell(c.x - 1, c.y) });
+  return ns.filter(n => !n.cell.visited);
+}
+
+const OPP = { N: 'S', S: 'N', E: 'W', W: 'E' };
+
+function removeWall(a, dir, b) {
+  a.walls[dir] = false;
+  b.walls[OPP[dir]] = false;
+}
+
+// ── Canvas sizing ────────────────────────────────────────────────────────────
+function sizeCanvas() {
+  const maxPx = Math.min(window.innerWidth - 32, window.innerHeight - 200, 560);
+  const n = parseInt(sizeSelect.value);
+  COLS = n; ROWS = n;
+  CELL = Math.floor(maxPx / n);
+  canvas.width  = COLS * CELL;
+  canvas.height = ROWS * CELL;
+}
+
+// ── Drawing ──────────────────────────────────────────────────────────────────
+const WALL_COLOR   = '#6d28d9';
+const VISITED_COLOR = '#1a0030';
+const PATH_COLOR   = '#2d0a52';
+const FRONTIER_COLOR = '#5b21b6';
+const SOLUTION_COLOR = 'rgba(167,139,250,0.35)';
+const PLAYER_COLOR = '#f0abfc';
+
+function drawCell(c, fillColor) {
+  const px = c.x * CELL;
+  const py = c.y * CELL;
+  ctx.fillStyle = fillColor;
+  ctx.fillRect(px, py, CELL, CELL);
+}
+
+function drawWalls(c) {
+  const px = c.x * CELL;
+  const py = c.y * CELL;
+  ctx.strokeStyle = WALL_COLOR;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if (c.walls.N) { ctx.moveTo(px, py);        ctx.lineTo(px + CELL, py); }
+  if (c.walls.S) { ctx.moveTo(px, py + CELL); ctx.lineTo(px + CELL, py + CELL); }
+  if (c.walls.W) { ctx.moveTo(px, py);        ctx.lineTo(px, py + CELL); }
+  if (c.walls.E) { ctx.moveTo(px + CELL, py); ctx.lineTo(px + CELL, py + CELL); }
+  ctx.stroke();
+}
+
+function drawAll() {
+  ctx.fillStyle = '#0d0010';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (const c of grid) {
+    let fill = '#0d0010';
+    if (c.visited) fill = VISITED_COLOR;
+    drawCell(c, fill);
+    drawWalls(c);
+  }
+
+  // Solution overlay
+  if (showSolution && solutionPath.length) {
+    for (const c of solutionPath) {
+      ctx.fillStyle = SOLUTION_COLOR;
+      ctx.fillRect(c.x * CELL + 2, c.y * CELL + 2, CELL - 4, CELL - 4);
+    }
+  }
+
+  // Player trail
+  if (playerActive) {
+    for (const key of visited) {
+      const [vx, vy] = key.split(',').map(Number);
+      ctx.fillStyle = 'rgba(192,132,252,0.12)';
+      ctx.fillRect(vx * CELL + 1, vy * CELL + 1, CELL - 2, CELL - 2);
+    }
+  }
+
+  // Draw start and end labels
+  const fs = Math.max(CELL - 4, 10);
+  ctx.font = `${fs}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Cheese at end
+  ctx.fillText('🧀', (COLS - 1) * CELL + CELL / 2, (ROWS - 1) * CELL + CELL / 2);
+
+  // Player
+  if (playerActive) {
+    ctx.fillText('🐭', player.x * CELL + CELL / 2, player.y * CELL + CELL / 2);
+  }
+}
+
+function drawGen(stack, current) {
+  drawAll();
+
+  // Highlight stack (frontier)
+  for (const c of stack) {
+    ctx.fillStyle = PATH_COLOR;
+    ctx.fillRect(c.x * CELL + 1, c.y * CELL + 1, CELL - 2, CELL - 2);
+  }
+
+  // Highlight current cell
+  if (current) {
+    ctx.fillStyle = FRONTIER_COLOR;
+    ctx.fillRect(current.x * CELL + 1, current.y * CELL + 1, CELL - 2, CELL - 2);
+  }
+}
+
+// ── Generation (iterative DFS with animation) ────────────────────────────────
+let genRAF = null;
+let genStack = [];
+let genCurrent = null;
+let genStepBatch = 1;
+
+function startGen() {
+  if (genRAF) cancelAnimationFrame(genRAF);
+  sizeCanvas();
+
+  grid = [];
+  for (let y = 0; y < ROWS; y++)
+    for (let x = 0; x < COLS; x++)
+      grid.push(makeCell(x, y));
+
+  genStack = [];
+  genCurrent = grid[0];
+  genCurrent.visited = true;
+  genStack.push(genCurrent);
+
+  generating = true;
+  solved = false;
+  showSolution = false;
+  playerActive = false;
+  solutionPath = [];
+  player = { x: 0, y: 0 };
+  visited = new Set(['0,0']);
+
+  genBtn.disabled = true;
+  solveBtn.disabled = true;
+  resetBtn.disabled = true;
+  statusEl.textContent = 'Carving…';
+
+  genLoop();
+}
+
+function genLoop() {
+  const speed = parseInt(speedSlider.value);
+  genStepBatch = Math.max(1, Math.floor(speed * speed / 300));
+
+  for (let i = 0; i < genStepBatch; i++) {
+    if (genStack.length === 0) { finishGen(); return; }
+
+    genCurrent = genStack[genStack.length - 1];
+    const ns = neighbors(genCurrent);
+
+    if (ns.length === 0) {
+      genStack.pop();
+    } else {
+      const pick = ns[Math.floor(Math.random() * ns.length)];
+      removeWall(genCurrent, pick.dir, pick.cell);
+      pick.cell.visited = true;
+      genStack.push(pick.cell);
+    }
+  }
+
+  drawGen(genStack, genCurrent);
+  genRAF = requestAnimationFrame(genLoop);
+}
+
+function finishGen() {
+  generating = false;
+  // Reset cell visited flag — repurpose for player tracking only
+  for (const c of grid) c.visited = true; // all carved
+
+  solveMaze();
+  drawAll();
+
+  genBtn.disabled = false;
+  solveBtn.disabled = false;
+  resetBtn.disabled = false;
+  playerActive = true;
+  statusEl.textContent = '🐭 Navigate to 🧀 — arrow keys / WASD / swipe';
+}
+
+// ── BFS Solution ─────────────────────────────────────────────────────────────
+function solveMaze() {
+  const start = grid[0];
+  const end = grid[grid.length - 1];
+
+  const prev = new Map();
+  const queue = [start];
+  prev.set(start, null);
+
+  while (queue.length) {
+    const cur = queue.shift();
+    if (cur === end) break;
+
+    const ns = [];
+    if (!cur.walls.N && cur.y > 0)      ns.push(cell(cur.x, cur.y - 1));
+    if (!cur.walls.S && cur.y < ROWS-1) ns.push(cell(cur.x, cur.y + 1));
+    if (!cur.walls.E && cur.x < COLS-1) ns.push(cell(cur.x + 1, cur.y));
+    if (!cur.walls.W && cur.x > 0)      ns.push(cell(cur.x - 1, cur.y));
+
+    for (const n of ns) {
+      if (!prev.has(n)) { prev.set(n, cur); queue.push(n); }
+    }
+  }
+
+  solutionPath = [];
+  let cur = end;
+  while (cur) { solutionPath.unshift(cur); cur = prev.get(cur); }
+}
+
+// ── Player movement ───────────────────────────────────────────────────────────
+function tryMove(dx, dy) {
+  if (!playerActive) return;
+  const nx = player.x + dx;
+  const ny = player.y + dy;
+  if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) return;
+
+  const c = cell(player.x, player.y);
+  let dir;
+  if (dx === 1)  dir = 'E';
+  if (dx === -1) dir = 'W';
+  if (dy === 1)  dir = 'S';
+  if (dy === -1) dir = 'N';
+
+  if (c.walls[dir]) return; // wall in the way
+
+  player.x = nx;
+  player.y = ny;
+  visited.add(`${nx},${ny}`);
+
+  drawAll();
+
+  if (nx === COLS - 1 && ny === ROWS - 1) {
+    setTimeout(showWin, 200);
+  }
+}
+
+document.addEventListener('keydown', e => {
+  const map = {
+    ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0],
+    w: [0,-1], s: [0,1], a: [-1,0], d: [1,0],
+    W: [0,-1], S: [0,1], A: [-1,0], D: [1,0],
+  };
+  const dir = map[e.key];
+  if (dir) { e.preventDefault(); tryMove(...dir); }
+});
+
+// Touch swipe
+canvas.addEventListener('touchstart', e => {
+  touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+});
+canvas.addEventListener('touchend', e => {
+  if (!touchStart) return;
+  const dx = e.changedTouches[0].clientX - touchStart.x;
+  const dy = e.changedTouches[0].clientY - touchStart.y;
+  const ad = Math.abs(dx), bd = Math.abs(dy);
+  if (ad < 10 && bd < 10) return;
+  if (ad > bd) tryMove(dx > 0 ? 1 : -1, 0);
+  else         tryMove(0, dy > 0 ? 1 : -1);
+  touchStart = null;
+});
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
+genBtn.onclick = startGen;
+
+solveBtn.onclick = () => {
+  showSolution = !showSolution;
+  solveBtn.textContent = showSolution ? '🙈 Hide Solution' : '🤖 Show Solution';
+  solveBtn.classList.toggle('active', showSolution);
+  drawAll();
+};
+
+resetBtn.onclick = () => {
+  player = { x: 0, y: 0 };
+  visited = new Set(['0,0']);
+  drawAll();
+  statusEl.textContent = '🐭 Reset — find the 🧀!';
+};
+
+sizeSelect.onchange = () => { if (!generating) startGen(); };
+
+// ── Win ───────────────────────────────────────────────────────────────────────
+const winMsgs = [
+  'A mouse always finds the cheese. 🧀',
+  'The cheese was within you all along. (It wasn\'t. It was at the end.)',
+  'Cheese acquired. Mouse vindicated.',
+  'Victory! Time to celebrate with more cheese.',
+  'You navigated the maze of life. Also this maze.',
+  'Cheese: obtained. Dignity: intact.',
+  '🐭 The little mouse did it! 🧀',
+];
+
+function showWin() {
+  playerActive = false;
+  winMsg.textContent = winMsgs[Math.floor(Math.random() * winMsgs.length)];
+  winOverlay.classList.add('show');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  if (!generating && grid.length) {
+    sizeCanvas();
+    // Re-layout: rebuild from scratch doesn't make sense mid-solve
+    // Just redraw at new size is not trivial — simplest: regenerate
+    startGen();
+  }
+});
+
+// Start immediately
+startGen();
+</script>
+</body>
+</html>
