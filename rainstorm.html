@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rainstorm Window 🌧️</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#0a0a14;font-family:'Segoe UI',system-ui,sans-serif;cursor:none}
+canvas{display:block;position:absolute;top:0;left:0}
+#bg{z-index:0}
+#rain{z-index:1}
+#glass{z-index:2}
+#ui{z-index:3}
+.cursor{position:fixed;width:12px;height:12px;border-radius:50%;background:rgba(180,160,255,.4);pointer-events:none;z-index:99;transform:translate(-50%,-50%);box-shadow:0 0 8px rgba(180,160,255,.3);transition:opacity .3s}
+.controls{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:10;opacity:0;transition:opacity .4s}
+body:hover .controls{opacity:1}
+.btn{background:rgba(30,20,50,.7);color:#c4b0ff;border:1px solid rgba(180,160,255,.2);padding:8px 16px;border-radius:20px;cursor:pointer;font-size:13px;backdrop-filter:blur(8px);transition:all .2s}
+.btn:hover{background:rgba(60,40,100,.7);border-color:rgba(180,160,255,.5)}
+.btn.active{background:rgba(100,60,180,.5);border-color:#b4a0ff;color:#fff}
+.label{position:fixed;top:20px;left:50%;transform:translateX(-50%);color:rgba(180,160,255,.3);font-size:12px;letter-spacing:3px;text-transform:uppercase;z-index:10;opacity:0;transition:opacity .4s}
+body:hover .label{opacity:1}
+select{appearance:none;background:rgba(30,20,50,.7);color:#c4b0ff;border:1px solid rgba(180,160,255,.2);padding:8px 14px;border-radius:20px;cursor:pointer;font-size:13px;backdrop-filter:blur(8px)}
+select:focus{outline:none;border-color:#b4a0ff}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="label">🌧️ Rainstorm Window</div>
+<canvas id="bg"></canvas>
+<canvas id="rain"></canvas>
+<canvas id="glass"></canvas>
+<canvas id="ui"></canvas>
+<div class="controls">
+  <button class="btn active" id="btnRain" onclick="toggleRain()">🌧️ Rain</button>
+  <button class="btn" id="btnThunder" onclick="toggleThunder()">⚡ Thunder</button>
+  <button class="btn" id="btnFog" onclick="toggleFog()">🌫️ Fog</button>
+  <select id="intensity" onchange="setIntensity(this.value)">
+    <option value="light">Light Drizzle</option>
+    <option value="medium" selected>Steady Rain</option>
+    <option value="heavy">Downpour</option>
+    <option value="storm">Storm</option>
+  </select>
+  <select id="scene" onchange="setScene(this.value)">
+    <option value="night" selected>Night</option>
+    <option value="dusk">Dusk</option>
+    <option value="dawn">Dawn</option>
+    <option value="overcast">Overcast Day</option>
+  </select>
+  <button class="btn" id="btnSound" onclick="toggleSound()">🔇 Sound</button>
+</div>
+
+<script>
+const bgC=document.getElementById('bg'),rainC=document.getElementById('rain'),glassC=document.getElementById('glass'),uiC=document.getElementById('ui');
+const bg=bgC.getContext('2d'),rc=rainC.getContext('2d'),gc=glassC.getContext('2d'),uc=uiC.getContext('2d');
+let W,H;
+function resize(){W=window.innerWidth;H=window.innerHeight;[bgC,rainC,glassC,uiC].forEach(c=>{c.width=W;c.height=H})}
+resize();window.addEventListener('resize',resize);
+
+// cursor
+const cur=document.getElementById('cursor');
+let mx=W/2,my=H/2;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px'});
+
+// state
+let rainOn=true,thunderOn=false,fogOn=false,soundOn=false;
+let intensity='medium',scene='night';
+let audioCtx=null,rainNoise=null,rainGain=null;
+
+const intensityMap={light:{drops:80,speed:4,streak:12,splash:.3},medium:{drops:200,speed:7,streak:18,splash:.6},heavy:{drops:400,speed:11,streak:25,splash:.85},storm:{drops:600,speed:15,streak:32,splash:1}};
+const sceneColors={
+  night:{sky:['#0a0a14','#0f0f22','#141428'],ground:'#08080f',windowLight:'rgba(255,220,150,.03)',lightning:'rgba(200,180,255,.8)'},
+  dusk:{sky:['#1a1028','#2a1535','#3d1a3a'],ground:'#120a18',windowLight:'rgba(255,180,120,.04)',lightning:'rgba(255,200,220,.7)'},
+  dawn:{sky:['#1a1830','#2a2040','#3a2848'],ground:'#100e18',windowLight:'rgba(200,180,255,.03)',lightning:'rgba(220,200,255,.7)'},
+  overcast:{sky:['#2a2a35','#353540','#40404a'],ground:'#1a1a22',windowLight:'rgba(200,200,220,.02)',lightning:'rgba(255,255,255,.6)'}
+};
+
+// drops on glass
+class GlassDrop{
+  constructor(){this.reset()}
+  reset(){
+    this.x=Math.random()*W;
+    this.y=-10-Math.random()*100;
+    this.r=1.5+Math.random()*3;
+    this.vy=.3+Math.random()*.5;
+    this.vx=(Math.random()-.5)*.2;
+    this.trail=[];
+    this.maxTrail=8+Math.random()*12|0;
+    this.life=200+Math.random()*400|0;
+    this.age=0;
+    this.merged=false;
+  }
+  update(){
+    this.age++;
+    if(this.age>this.life||this.y>H+10){this.reset();return}
+    // gravity pulls down, slight wind
+    this.vy+=.01+Math.random()*.005;
+    this.vx+=(Math.random()-.5)*.05;
+    this.vy=Math.min(this.vy,3);
+    // sometimes pause (surface tension)
+    if(Math.random()<.02)this.vy*=.1;
+    this.trail.push({x:this.x,y:this.y,r:this.r*.7});
+    if(this.trail.length>this.maxTrail)this.trail.shift();
+    this.x+=this.vx;
+    this.y+=this.vy;
+  }
+  draw(ctx){
+    let a=Math.max(0,1-this.age/this.life);
+    // trail
+    for(let i=0;i<this.trail.length;i++){
+      let t=this.trail[i];
+      let ta=a*(i/this.trail.length)*.3;
+      ctx.beginPath();
+      ctx.arc(t.x,t.y,t.r*.6,0,Math.PI*2);
+      ctx.fillStyle=`rgba(180,200,255,${ta})`;
+      ctx.fill();
+    }
+    // main drop
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(200,220,255,${a*.5})`;
+    ctx.fill();
+    // highlight
+    ctx.beginPath();
+    ctx.arc(this.x-.5,this.y-.5,this.r*.4,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,255,${a*.4})`;
+    ctx.fill();
+  }
+}
+
+// falling rain streaks
+class RainStreak{
+  constructor(){this.reset()}
+  reset(){
+    let cfg=intensityMap[intensity];
+    this.x=Math.random()*W;
+    this.y=-Math.random()*H;
+    this.len=cfg.streak*(0.5+Math.random());
+    this.speed=cfg.speed*(0.7+Math.random()*.6);
+    this.alpha=.1+Math.random()*.3;
+    this.wind=-1.5;
+  }
+  update(){
+    this.y+=this.speed;
+    this.x+=this.wind;
+    if(this.y>H){
+      // splash
+      if(Math.random()<intensityMap[intensity].splash)splashes.push(new Splash(this.x,H-5+Math.random()*10));
+      this.reset();
+    }
+  }
+  draw(ctx){
+    ctx.beginPath();
+    ctx.moveTo(this.x,this.y);
+    ctx.lineTo(this.x+this.wind*2,this.y-this.len);
+    ctx.strokeStyle=`rgba(180,200,255,${this.alpha})`;
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+}
+
+class Splash{
+  constructor(x,y){this.x=x;this.y=y;this.life=8+Math.random()*6|0;this.age=0;this.particles=[];
+    for(let i=0;i<3+Math.random()*4|0;i++){
+      this.particles.push({x:0,y:0,vx:(Math.random()-.5)*3,vy:-1-Math.random()*2,r:.5+Math.random()});
+    }
+  }
+  update(){this.age++;this.particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.2})}
+  draw(ctx){
+    let a=1-this.age/this.life;if(a<=0)return;
+    this.particles.forEach(p=>{
+      ctx.beginPath();ctx.arc(this.x+p.x,this.y+p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(180,200,255,${a*.4})`;ctx.fill();
+    });
+  }
+  dead(){return this.age>=this.life}
+}
+
+// lightning
+let lightningFlash=0,lightningBolts=[];
+class LightningBolt{
+  constructor(){
+    this.x=Math.random()*W;this.segments=[];
+    let x=this.x,y=0;
+    for(let i=0;i<8+Math.random()*8|0;i++){
+      let nx=x+(Math.random()-.5)*80;
+      let ny=y+20+Math.random()*40;
+      this.segments.push({x1:x,y1:y,x2:nx,y2:ny});
+      // branch
+      if(Math.random()<.3){
+        let bx=nx+(Math.random()-.5)*60,by=ny+15+Math.random()*30;
+        this.segments.push({x1:nx,y1:ny,x2:bx,y2:by});
+      }
+      x=nx;y=ny;
+    }
+    this.life=4+Math.random()*3|0;this.age=0;
+  }
+  draw(ctx){
+    let a=1-this.age/this.life;
+    let sc=sceneColors[scene];
+    ctx.lineWidth=2;ctx.strokeStyle=sc.lightning.replace(/[\d.]+\)$/,a*.8+')');
+    ctx.shadowBlur=20;ctx.shadowColor=sc.lightning;
+    this.segments.forEach(s=>{ctx.beginPath();ctx.moveTo(s.x1,s.y1);ctx.lineTo(s.x2,s.y2);ctx.stroke()});
+    ctx.shadowBlur=0;
+    this.age++;
+  }
+  dead(){return this.age>=this.life}
+}
+
+// pooling at bottom
+let poolHeight=0;
+
+// init
+let streaks=[],glassDrops=[],splashes=[];
+function initDrops(){
+  let cfg=intensityMap[intensity];
+  streaks=[];glassDrops=[];
+  for(let i=0;i<cfg.drops;i++)streaks.push(new RainStreak());
+  let gCount=Math.floor(cfg.drops*.15);
+  for(let i=0;i<gCount;i++)glassDrops.push(new GlassDrop());
+}
+initDrops();
+
+// window frame
+function drawFrame(ctx){
+  // wooden frame
+  ctx.strokeStyle='rgba(60,40,30,.6)';
+  ctx.lineWidth=30;
+  ctx.strokeRect(15,15,W-30,H-30);
+  // inner frame
+  ctx.strokeStyle='rgba(80,55,40,.4)';
+  ctx.lineWidth=4;
+  ctx.strokeRect(30,30,W-60,H-60);
+  // cross bars
+  ctx.beginPath();
+  ctx.moveTo(W/2,30);ctx.lineTo(W/2,H-30);
+  ctx.moveTo(30,H/2);ctx.lineTo(W-30,H/2);
+  ctx.strokeStyle='rgba(60,40,30,.5)';
+  ctx.lineWidth=8;
+  ctx.stroke();
+  // condensation at bottom
+  let grd=ctx.createLinearGradient(0,H-100,0,H);
+  grd.addColorStop(0,'rgba(150,170,200,0)');
+  grd.addColorStop(1,'rgba(150,170,200,.08)');
+  ctx.fillStyle=grd;
+  ctx.fillRect(30,H-100,W-60,70);
+}
+
+// fog particles
+let fogParticles=[];
+for(let i=0;i<30;i++)fogParticles.push({x:Math.random()*W,y:H*.3+Math.random()*H*.5,r:100+Math.random()*200,vx:.1+Math.random()*.3,a:.02+Math.random()*.03});
+
+// background scene
+function drawBg(){
+  let sc=sceneColors[scene];
+  // sky gradient
+  let grd=bg.createLinearGradient(0,0,0,H);
+  grd.addColorStop(0,sc.sky[0]);
+  grd.addColorStop(.5,sc.sky[1]);
+  grd.addColorStop(1,sc.sky[2]);
+  bg.fillStyle=grd;
+  bg.fillRect(0,0,W,H);
+  
+  // distant city silhouette
+  bg.fillStyle=sc.ground;
+  let bx=0;
+  while(bx<W){
+    let bw=20+Math.random()*40;
+    let bh=30+Math.random()*120;
+    bg.fillRect(bx,H*.6-bh,bw,bh+H*.4);
+    // tiny windows
+    for(let wy=H*.6-bh+5;wy<H*.6;wy+=12){
+      for(let wx=bx+4;wx<bx+bw-4;wx+=8){
+        if(Math.random()<.3){
+          bg.fillStyle=sc.windowLight.replace(/[\d.]+\)$/,(Math.random()*.08+.02)+')');
+          bg.fillRect(wx,wy,4,5);
+          bg.fillStyle=sc.ground;
+        }
+      }
+    }
+    bx+=bw+Math.random()*10;
+  }
+  
+  // ground
+  bg.fillStyle=sc.ground;
+  bg.fillRect(0,H*.6,W,H*.4);
+  
+  // lightning flash overlay
+  if(lightningFlash>0){
+    bg.fillStyle=`rgba(200,180,255,${lightningFlash*.15})`;
+    bg.fillRect(0,0,W,H);
+    lightningFlash=Math.max(0,lightningFlash-.15);
+  }
+}
+
+// sound
+function initAudio(){
+  if(audioCtx)return;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  // rain noise
+  let bufSize=audioCtx.sampleRate*2;
+  let buf=audioCtx.createBuffer(1,bufSize,audioCtx.sampleRate);
+  let d=buf.getChannelData(0);
+  // brown noise (low rumble rain)
+  let last=0;
+  for(let i=0;i<bufSize;i++){
+    let white=Math.random()*2-1;
+    d[i]=(last+(.02*white))/1.02;
+    last=d[i];
+    d[i]*=3.5;
+  }
+  rainNoise=audioCtx.createBufferSource();
+  rainNoise.buffer=buf;rainNoise.loop=true;
+  let filter=audioCtx.createBiquadFilter();
+  filter.type='lowpass';filter.frequency.value=800;
+  rainGain=audioCtx.createGain();
+  rainGain.gain.value=0;
+  rainNoise.connect(filter);filter.connect(rainGain);rainGain.connect(audioCtx.destination);
+  rainNoise.start();
+}
+function updateSound(){
+  if(!soundOn||!rainGain)return;
+  let vol={light:.15,medium:.25,heavy:.4,storm:.55}[intensity]||.25;
+  rainGain.gain.linearRampToValueAtTime(rainOn?vol:0,audioCtx.currentTime+.5);
+}
+function playThunder(){
+  if(!audioCtx||!soundOn)return;
+  let osc=audioCtx.createOscillator();
+  let g=audioCtx.createGain();
+  osc.type='sawtooth';osc.frequency.value=40+Math.random()*30;
+  let f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=200;
+  osc.connect(f);f.connect(g);g.connect(audioCtx.destination);
+  g.gain.setValueAtTime(.3,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+2);
+  osc.start();osc.stop(audioCtx.currentTime+2);
+}
+
+// thunder timer
+let thunderTimer=0;
+function maybeThunder(){
+  if(!thunderOn)return;
+  thunderTimer--;
+  if(thunderTimer<=0){
+    lightningFlash=1;
+    lightningBolts.push(new LightningBolt());
+    if(soundOn)setTimeout(playThunder,200+Math.random()*800);
+    thunderTimer=120+Math.random()*300|0;
+    if(intensity==='storm')thunderTimer*=.5;
+  }
+}
+
+// main loop
+let frame=0;
+function loop(){
+  requestAnimationFrame(loop);
+  frame++;
+  
+  // bg (redraw occasionally or on lightning)
+  if(frame%3===0||lightningFlash>0)drawBg();
+  
+  // rain
+  rc.clearRect(0,0,W,H);
+  if(rainOn){
+    streaks.forEach(s=>{s.update();s.draw(rc)});
+    splashes=splashes.filter(s=>{s.update();s.draw(rc);return!s.dead()});
+  }
+  
+  // glass drops
+  gc.clearRect(0,0,W,H);
+  if(rainOn)glassDrops.forEach(d=>{d.update();d.draw(gc)});
+  
+  // fog
+  if(fogOn){
+    fogParticles.forEach(p=>{
+      p.x+=p.vx;if(p.x>W+p.r)p.x=-p.r;
+      gc.beginPath();
+      let grd=gc.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);
+      grd.addColorStop(0,`rgba(150,160,180,${p.a})`);
+      grd.addColorStop(1,'rgba(150,160,180,0)');
+      gc.fillStyle=grd;gc.arc(p.x,p.y,p.r,0,Math.PI*2);gc.fill();
+    });
+  }
+  
+  // lightning bolts
+  lightningBolts=lightningBolts.filter(b=>{b.draw(gc);return!b.dead()});
+  
+  // window frame
+  drawFrame(gc);
+  
+  // thunder check
+  if(frame%2===0)maybeThunder();
+}
+
+loop();
+
+// controls
+function toggleRain(){rainOn=!rainOn;document.getElementById('btnRain').classList.toggle('active');if(!rainOn){streaks.forEach(s=>s.y=H+100)}else initDrops();updateSound()}
+function toggleThunder(){thunderOn=!thunderOn;document.getElementById('btnThunder').classList.toggle('active');if(thunderOn)thunderTimer=30}
+function toggleFog(){fogOn=!fogOn;document.getElementById('btnFog').classList.toggle('active')}
+function setIntensity(v){intensity=v;initDrops();updateSound()}
+function setScene(v){scene=v}
+function toggleSound(){
+  soundOn=!soundOn;
+  let btn=document.getElementById('btnSound');
+  btn.textContent=soundOn?'🔊 Sound':'🔇 Sound';
+  btn.classList.toggle('active');
+  if(soundOn){initAudio();updateSound()}
+  else if(rainGain)rainGain.gain.linearRampToValueAtTime(0,audioCtx.currentTime+.3);
+}
+
+// click for ripple
+document.addEventListener('click',e=>{
+  for(let i=0;i<5;i++)splashes.push(new Splash(e.clientX+(Math.random()-0.5)*30,e.clientY+(Math.random()-0.5)*20));
+});
+</script>
+</body>
+</html>
