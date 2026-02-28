@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>February 2026 Wrapped 💜</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0014;color:#e0d0f0;font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden;min-height:100vh}
+canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+
+.slide{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;position:relative;z-index:1;opacity:0;transform:translateY(30px);transition:opacity .8s,transform .8s}
+.slide.visible{opacity:1;transform:translateY(0)}
+
+.big-number{font-size:clamp(4rem,15vw,10rem);font-weight:900;background:linear-gradient(135deg,#c084fc,#f472b6,#facc15);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;margin:20px 0}
+.subtitle{font-size:clamp(1rem,3vw,1.6rem);color:#c084fc;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+.detail{font-size:clamp(.9rem,2.5vw,1.2rem);color:#a78bfa;max-width:600px;text-align:center;line-height:1.6;margin:10px 0}
+.emoji-big{font-size:clamp(3rem,10vw,6rem);margin:15px 0}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;max-width:700px;width:100%;margin:20px 0}
+.stat-card{background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);border-radius:16px;padding:20px;text-align:center}
+.stat-card .num{font-size:2rem;font-weight:800;color:#facc15}
+.stat-card .label{font-size:.8rem;color:#a78bfa;margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+
+.achievement{background:rgba(250,204,21,.1);border:1px solid rgba(250,204,21,.3);border-radius:16px;padding:16px 24px;margin:8px 0;max-width:500px;width:100%;display:flex;align-items:center;gap:12px}
+.achievement .icon{font-size:2rem;flex-shrink:0}
+.achievement .text{font-size:.95rem;color:#e0d0f0}
+.achievement .text strong{color:#facc15}
+
+.timeline{max-width:600px;width:100%;margin:20px 0}
+.t-item{display:flex;gap:12px;margin:8px 0;align-items:flex-start}
+.t-dot{width:12px;height:12px;border-radius:50%;background:#c084fc;flex-shrink:0;margin-top:5px}
+.t-content{font-size:.9rem;line-height:1.5}
+.t-date{color:#a78bfa;font-size:.75rem}
+
+h2{font-size:clamp(1.5rem,4vw,2.5rem);text-align:center;margin-bottom:10px}
+.glow{text-shadow:0 0 30px rgba(192,132,252,.5)}
+
+.scroll-hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:#a78bfa;font-size:.8rem;z-index:10;animation:bob 2s infinite;opacity:.7}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-8px)}}
+
+.finale-card{background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(244,114,182,.2));border:1px solid rgba(192,132,252,.4);border-radius:24px;padding:32px;max-width:600px;width:100%;text-align:center}
+.finale-card p{margin:12px 0;line-height:1.7;font-size:1.05rem}
+
+.confetti{position:fixed;pointer-events:none;z-index:100}
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+<div class="scroll-hint">↓ scroll ↓</div>
+
+<!-- Slide 1: Title -->
+<div class="slide" id="s1">
+  <div class="subtitle">Your month in review</div>
+  <div class="big-number">FEB</div>
+  <div class="detail">28 days. 20 work days. 1 incredible month.</div>
+  <div class="emoji-big">💜</div>
+</div>
+
+<!-- Slide 2: Sales -->
+<div class="slide" id="s2">
+  <div class="subtitle">You closed</div>
+  <div class="big-number">54+</div>
+  <div class="detail">sales across the country — from Honolulu to Portland, Sacramento to Las Vegas</div>
+  <div class="emoji-big">🔥</div>
+</div>
+
+<!-- Slide 3: Revenue -->
+<div class="slide" id="s3">
+  <div class="subtitle">Net claimed sales</div>
+  <div class="big-number">$53k+</div>
+  <div class="detail">As of Feb 20 — with 6 more work days still cooking. The $60k tier was within reach.</div>
+</div>
+
+<!-- Slide 4: Best Day -->
+<div class="slide" id="s4">
+  <div class="subtitle">Your best day</div>
+  <div class="big-number">$9,725</div>
+  <div class="detail">February 20th. 16 line items. Jordan Rode's full treatment plan. Rob Simon's triple LHR. Yara's Platinum package. You were ON FIRE. 🔥</div>
+</div>
+
+<!-- Slide 5: Stats Grid -->
+<div class="slide" id="s5">
+  <h2 class="glow">By the Numbers</h2>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="num">54+</div><div class="label">Sales Closed</div></div>
+    <div class="stat-card"><div class="num">10+</div><div class="label">Stores Served</div></div>
+    <div class="stat-card"><div class="num">114%</div><div class="label">Porter Ranch Goal</div></div>
+    <div class="stat-card"><div class="num">20</div><div class="label">Work Days</div></div>
+    <div class="stat-card"><div class="num">$3.7k</div><div class="label">Biggest Single Sale</div></div>
+    <div class="stat-card"><div class="num">5</div><div class="label">States Covered</div></div>
+  </div>
+</div>
+
+<!-- Slide 6: Porter Ranch -->
+<div class="slide" id="s6">
+  <div class="emoji-big">🏆</div>
+  <h2 class="glow">Porter Ranch: Crushed It</h2>
+  <div class="detail">Goal was $31,020. You hit <strong style="color:#facc15">$35,317</strong> — that's 114% of target. Exceeded by $4,297. Calendar Lead energy. 💪</div>
+</div>
+
+<!-- Slide 7: Achievements -->
+<div class="slide" id="s7">
+  <h2 class="glow">Achievements Unlocked</h2>
+  <div class="achievement"><div class="icon">🌺</div><div class="text"><strong>Aloha Closer</strong> — Closed deals in Honolulu (3,000+ miles away, still selling)</div></div>
+  <div class="achievement"><div class="icon">💰</div><div class="text"><strong>Five-Figure Day</strong> — Nearly $10k in a single day (Feb 20)</div></div>
+  <div class="achievement"><div class="icon">🎯</div><div class="text"><strong>Porter Ranch: Exceeded</strong> — 114% of store goal</div></div>
+  <div class="achievement"><div class="icon">🗺️</div><div class="text"><strong>Coast to Coast</strong> — Sales in HI, CA, NV, OR, WA</div></div>
+  <div class="achievement"><div class="icon">💜</div><div class="text"><strong>Valentine's Closer</strong> — Sold on Feb 14 because love doesn't pay rent</div></div>
+  <div class="achievement"><div class="icon">📈</div><div class="text"><strong>Trend Setter</strong> — Oct→Nov→Dec→Jan: steady growth trajectory</div></div>
+</div>
+
+<!-- Slide 8: Highlight Reel -->
+<div class="slide" id="s8">
+  <h2 class="glow">Highlight Reel</h2>
+  <div class="timeline">
+    <div class="t-item"><div class="t-dot"></div><div class="t-content"><div class="t-date">Feb 5</div>Amanda Adam — double $1,470 LTR packages at Glendale</div></div>
+    <div class="t-item"><div class="t-dot"></div><div class="t-content"><div class="t-date">Feb 6</div>Lina Blanton — $3,755 Platinum Full in Honolulu 🌺</div></div>
+    <div class="t-item"><div class="t-dot"></div><div class="t-content"><div class="t-date">Feb 12</div>Katherine Castillo — C+B + LHR combo at Glendale ($2,063)</div></div>
+    <div class="t-item"><div class="t-dot"></div><div class="t-content"><div class="t-date">Feb 14 ♡</div>Valentine's double: Gabriela + Ivanna, two Platinum packages</div></div>
+    <div class="t-item"><div class="t-dot"></div><div class="t-content"><div class="t-date">Feb 19</div>Maureen Brown — $1,800 Clear+Brilliant Touch at La Mesa</div></div>
+    <div class="t-item"><div class="t-dot"></div><div class="t-content"><div class="t-date">Feb 20 🔥</div>THE DAY — $9,725 across 6 clients, 16 line items</div></div>
+    <div class="t-item"><div class="t-dot"></div><div class="t-content"><div class="t-date">Feb 27</div>Aggregate tracking: $79,169 — cleared the penalty floor by $69 👀</div></div>
+  </div>
+</div>
+
+<!-- Slide 9: Monthly Trend -->
+<div class="slide" id="s9">
+  <h2 class="glow">The Trajectory</h2>
+  <div class="detail" style="margin-bottom:20px">You've been building all year. Look at this:</div>
+  <div style="display:flex;gap:12px;align-items:flex-end;height:200px;margin:20px 0">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:.7rem;color:#facc15">$82k</div>
+      <div style="width:50px;height:82px;background:linear-gradient(to top,#7c3aed,#c084fc);border-radius:8px 8px 0 0"></div>
+      <div style="font-size:.7rem;color:#a78bfa">Oct</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:.7rem;color:#facc15">$96k</div>
+      <div style="width:50px;height:96px;background:linear-gradient(to top,#7c3aed,#c084fc);border-radius:8px 8px 0 0"></div>
+      <div style="font-size:.7rem;color:#a78bfa">Nov</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:.7rem;color:#facc15">$115k</div>
+      <div style="width:50px;height:115px;background:linear-gradient(to top,#7c3aed,#f472b6);border-radius:8px 8px 0 0"></div>
+      <div style="font-size:.7rem;color:#a78bfa">Dec</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:.7rem;color:#facc15">$102k</div>
+      <div style="width:50px;height:102px;background:linear-gradient(to top,#7c3aed,#c084fc);border-radius:8px 8px 0 0"></div>
+      <div style="font-size:.7rem;color:#a78bfa">Jan</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:.7rem;color:#facc15">Feb</div>
+      <div style="width:50px;height:60px;background:linear-gradient(to top,#7c3aed,#facc15);border-radius:8px 8px 0 0;animation:pulse 2s infinite"></div>
+      <div style="font-size:.7rem;color:#facc15">TBD 🔥</div>
+    </div>
+  </div>
+  <div class="detail">Every month you're learning. Every month you're getting sharper.</div>
+</div>
+
+<!-- Slide 10: March -->
+<div class="slide" id="s10">
+  <div class="subtitle">Tomorrow</div>
+  <div class="big-number" style="font-size:clamp(3rem,10vw,7rem)">MARCH</div>
+  <div class="detail">Fresh scoreboard. 22 work days. You already have the March Kickoff Dashboard loaded.<br><br>The pipeline from February carries forward. The skills you sharpened this month don't reset.<br><br>March 1 = Sunday shift, 12-8p. First close sets the tone. 🎯</div>
+</div>
+
+<!-- Slide 11: Finale -->
+<div class="slide" id="s11">
+  <div class="finale-card">
+    <div class="emoji-big">🐭💜</div>
+    <h2 class="glow">From Your Mouse</h2>
+    <p>You worked 20 days this month. Long shifts — 8a-8p Mondays and Fridays, shorter but still grinding on Thursdays and Saturdays, Sundays too.</p>
+    <p>You closed deals in 5 states while being a mom to a 1-year-old. You hit 114% at Porter Ranch. You had a nearly $10k day.</p>
+    <p>You cleared the aggregate penalty floor by <strong style="color:#facc15">$69</strong>. (Nice.)</p>
+    <p>February was a month of building — commission, confidence, and momentum.</p>
+    <p style="font-size:1.3rem;color:#facc15;margin-top:20px"><strong>March is yours. Go get it. 🧀</strong></p>
+  </div>
+</div>
+
+<div style="height:60px"></div>
+
+<script>
+// Stars
+const c=document.getElementById('stars'),x=c.getContext('2d');
+function resize(){c.width=innerWidth;c.height=innerHeight}
+resize();addEventListener('resize',resize);
+const stars=Array.from({length:250},()=>({x:Math.random()*2000,y:Math.random()*2000,r:Math.random()*1.5+.3,s:Math.random()*2+1}));
+function drawStars(){x.clearRect(0,0,c.width,c.height);const t=Date.now()/1000;stars.forEach(s=>{const a=.3+.7*(.5+.5*Math.sin(t*s.s));x.beginPath();x.arc(s.x%c.width,s.y%c.height,s.r,0,Math.PI*2);x.fillStyle=`rgba(200,180,255,${a})`;x.fill()});requestAnimationFrame(drawStars)}
+drawStars();
+
+// Scroll reveal
+const slides=document.querySelectorAll('.slide');
+const hint=document.querySelector('.scroll-hint');
+const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')})},{threshold:.3});
+slides.forEach(s=>obs.observe(s));
+// Show first slide immediately
+setTimeout(()=>slides[0].classList.add('visible'),300);
+
+// Hide scroll hint after scrolling
+let scrolled=false;
+addEventListener('scroll',()=>{if(!scrolled&&scrollY>100){scrolled=true;hint.style.opacity='0';hint.style.transition='opacity .5s'}});
+
+// Confetti on last slide
+const lastObs=new IntersectionObserver(es=>{if(es[0].isIntersecting)confetti()},{threshold:.5});
+lastObs.observe(document.getElementById('s11'));
+
+function confetti(){
+  for(let i=0;i<60;i++){
+    const d=document.createElement('div');
+    d.className='confetti';
+    d.style.cssText=`left:${Math.random()*100}vw;top:-10px;width:${6+Math.random()*6}px;height:${6+Math.random()*6}px;background:${['#c084fc','#f472b6','#facc15','#34d399','#60a5fa'][Math.floor(Math.random()*5)]};border-radius:${Math.random()>.5?'50%':'2px'};position:fixed`;
+    document.body.appendChild(d);
+    const dur=2+Math.random()*3;
+    d.animate([
+      {transform:`translateY(0) rotate(0deg)`,opacity:1},
+      {transform:`translateY(${innerHeight+50}px) rotate(${360+Math.random()*720}deg)`,opacity:0}
+    ],{duration:dur*1000,easing:'cubic-bezier(.25,.46,.45,.94)'}).onfinish=()=>d.remove();
+  }
+}
+</script>
+</body>
+</html>

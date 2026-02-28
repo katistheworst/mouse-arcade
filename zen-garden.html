@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zen Sand Garden 🪨</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a1a; overflow: hidden; cursor: none; font-family: 'Georgia', serif; }
+canvas { display: block; }
+#ui {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 12px; opacity: 0; transition: opacity 0.4s;
+  z-index: 10;
+}
+body:hover #ui { opacity: 1; }
+.btn {
+  background: rgba(180,160,130,0.15); border: 1px solid rgba(180,160,130,0.3);
+  color: #c8b89a; padding: 8px 16px; border-radius: 20px; cursor: pointer;
+  font-family: Georgia, serif; font-size: 13px; transition: all 0.3s;
+  backdrop-filter: blur(8px);
+}
+.btn:hover { background: rgba(180,160,130,0.3); }
+.btn.active { background: rgba(180,160,130,0.35); border-color: #c8b89a; }
+#title {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  color: rgba(180,160,130,0.4); font-size: 14px; letter-spacing: 4px;
+  opacity: 0; transition: opacity 0.4s; pointer-events: none;
+}
+body:hover #title { opacity: 1; }
+#cursor {
+  position: fixed; pointer-events: none; z-index: 100;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(200,184,154,0.6); transform: translate(-50%,-50%);
+  box-shadow: 0 0 12px rgba(200,184,154,0.3);
+}
+</style>
+</head>
+<body>
+<div id="cursor"></div>
+<div id="title">枯 山 水</div>
+<canvas id="c"></canvas>
+<div id="ui">
+  <button class="btn active" data-tool="rake-thin">Fine Rake</button>
+  <button class="btn" data-tool="rake-wide">Wide Rake</button>
+  <button class="btn" data-tool="smooth">Smooth</button>
+  <button class="btn" data-tool="stone">Place Stone</button>
+  <button class="btn" data-tool="clear">Reset</button>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const cursor = document.getElementById('cursor');
+
+let W, H;
+let sandGrain = []; // heightmap-like grain directions
+let grooves = []; // stored groove lines
+let stones = [];
+let tool = 'rake-thin';
+let drawing = false;
+let lastX = 0, lastY = 0;
+let mouseX = 0, mouseY = 0;
+
+const SAND_BASE = [210, 195, 165];
+const SAND_LIGHT = [225, 212, 185];
+const SAND_DARK = [185, 168, 140];
+const SAND_SHADOW = [165, 148, 120];
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  redraw();
+}
+
+// Perlin-ish noise for sand texture
+function hash(x, y) {
+  let h = x * 374761393 + y * 668265263;
+  h = (h ^ (h >> 13)) * 1274126177;
+  return (h ^ (h >> 16)) / 2147483648;
+}
+
+function sandNoise(x, y, scale) {
+  const ix = Math.floor(x / scale), iy = Math.floor(y / scale);
+  const fx = (x / scale) - ix, fy = (y / scale) - iy;
+  const a = hash(ix, iy), b = hash(ix+1, iy);
+  const c = hash(ix, iy+1), d = hash(ix+1, iy+1);
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  return a + (b-a)*u + (c-a)*v + (a-b-c+d)*u*v;
+}
+
+function redraw() {
+  // Base sand
+  const imgData = ctx.createImageData(W, H);
+  const d = imgData.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const n1 = sandNoise(x, y, 40) * 0.5;
+      const n2 = sandNoise(x + 500, y + 500, 8) * 0.3;
+      const n3 = sandNoise(x + 1000, y + 1000, 3) * 0.2;
+      const n = n1 + n2 + n3;
+      const grain = (Math.random() - 0.5) * 8;
+      d[i] = SAND_BASE[0] + n * 30 + grain;
+      d[i+1] = SAND_BASE[1] + n * 25 + grain;
+      d[i+2] = SAND_BASE[2] + n * 20 + grain;
+      d[i+3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Draw grooves
+  for (const groove of grooves) {
+    drawGroove(groove);
+  }
+
+  // Draw stones
+  for (const stone of stones) {
+    drawStone(stone);
+  }
+}
+
+function drawGroove(groove) {
+  if (groove.points.length < 2) return;
+  const width = groove.width;
+  const tines = groove.tines;
+
+  // For each tine
+  for (let t = 0; t < tines; t++) {
+    const offset = (t - (tines - 1) / 2) * (width / tines);
+
+    // Shadow line (darker, offset slightly)
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(${SAND_SHADOW[0]},${SAND_SHADOW[1]},${SAND_SHADOW[2]},0.6)`;
+    ctx.lineWidth = width / tines * 0.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < groove.points.length; i++) {
+      const p = groove.points[i];
+      const nx = i < groove.points.length - 1
+        ? -(groove.points[i+1].y - p.y) : -(p.y - groove.points[i-1].y);
+      const ny = i < groove.points.length - 1
+        ? (groove.points[i+1].x - p.x) : (p.x - groove.points[i-1].x);
+      const len = Math.sqrt(nx*nx + ny*ny) || 1;
+      const x = p.x + (nx/len) * offset + 1;
+      const y = p.y + (ny/len) * offset + 1;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Light line (lighter, ridge)
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(${SAND_LIGHT[0]},${SAND_LIGHT[1]},${SAND_LIGHT[2]},0.5)`;
+    ctx.lineWidth = width / tines * 0.3;
+    for (let i = 0; i < groove.points.length; i++) {
+      const p = groove.points[i];
+      const nx = i < groove.points.length - 1
+        ? -(groove.points[i+1].y - p.y) : -(p.y - groove.points[i-1].y);
+      const ny = i < groove.points.length - 1
+        ? (groove.points[i+1].x - p.x) : (p.x - groove.points[i-1].x);
+      const len = Math.sqrt(nx*nx + ny*ny) || 1;
+      const x = p.x + (nx/len) * offset - 1;
+      const y = p.y + (ny/len) * offset - 1;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Main groove
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(${SAND_DARK[0]},${SAND_DARK[1]},${SAND_DARK[2]},0.45)`;
+    ctx.lineWidth = width / tines * 0.4;
+    for (let i = 0; i < groove.points.length; i++) {
+      const p = groove.points[i];
+      const nx = i < groove.points.length - 1
+        ? -(groove.points[i+1].y - p.y) : -(p.y - groove.points[i-1].y);
+      const ny = i < groove.points.length - 1
+        ? (groove.points[i+1].x - p.x) : (p.x - groove.points[i-1].x);
+      const len = Math.sqrt(nx*nx + ny*ny) || 1;
+      const x = p.x + (nx/len) * offset;
+      const y = p.y + (ny/len) * offset;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawStone(stone) {
+  const { x, y, rx, ry, rot, color, cracks } = stone;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+
+  // Shadow
+  ctx.beginPath();
+  ctx.ellipse(4, 4, rx + 3, ry + 3, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(80,70,55,0.3)';
+  ctx.fill();
+
+  // Stone body
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  const grad = ctx.createRadialGradient(-rx*0.3, -ry*0.3, 0, 0, 0, Math.max(rx, ry));
+  grad.addColorStop(0, `rgba(${color[0]+30},${color[1]+30},${color[2]+30},1)`);
+  grad.addColorStop(0.7, `rgba(${color[0]},${color[1]},${color[2]},1)`);
+  grad.addColorStop(1, `rgba(${color[0]-20},${color[1]-20},${color[2]-20},1)`);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Subtle texture
+  for (let i = 0; i < 20; i++) {
+    const px = (Math.random() - 0.5) * rx * 1.6;
+    const py = (Math.random() - 0.5) * ry * 1.6;
+    if ((px*px)/(rx*rx) + (py*py)/(ry*ry) < 1) {
+      ctx.fillStyle = `rgba(${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},${Math.random()>0.5?255:0},0.03)`;
+      ctx.fillRect(px, py, 2, 2);
+    }
+  }
+
+  // Highlight
+  ctx.beginPath();
+  ctx.ellipse(-rx*0.25, -ry*0.3, rx*0.4, ry*0.25, -0.3, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fill();
+
+  ctx.restore();
+
+  // Sand displacement rings around stone
+  for (let ring = 0; ring < 3; ring++) {
+    ctx.beginPath();
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.ellipse(0, 0, rx + 8 + ring * 6, ry + 8 + ring * 6, 0, 0, Math.PI * 2);
+    ctx.restore();
+    ctx.strokeStyle = `rgba(${SAND_DARK[0]},${SAND_DARK[1]},${SAND_DARK[2]},${0.2 - ring * 0.06})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+function makeStone(x, y) {
+  const types = [
+    { rx: [20,40], ry: [15,30], color: [100,95,85] },   // dark grey
+    { rx: [15,35], ry: [12,28], color: [130,120,105] },  // warm grey
+    { rx: [25,50], ry: [18,35], color: [90,85,80] },     // charcoal
+    { rx: [18,30], ry: [14,25], color: [140,135,125] },  // light
+  ];
+  const t = types[Math.floor(Math.random() * types.length)];
+  return {
+    x, y,
+    rx: t.rx[0] + Math.random() * (t.rx[1] - t.rx[0]),
+    ry: t.ry[0] + Math.random() * (t.ry[1] - t.ry[0]),
+    rot: Math.random() * Math.PI,
+    color: t.color.map(c => c + (Math.random()-0.5)*20),
+  };
+}
+
+let currentGroove = null;
+
+canvas.addEventListener('mousedown', (e) => {
+  if (tool === 'stone') {
+    stones.push(makeStone(e.clientX, e.clientY));
+    redraw();
+    return;
+  }
+  if (tool === 'clear') return;
+  drawing = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+
+  if (tool === 'smooth') {
+    // Smooth: erase nearby grooves partially
+    return;
+  }
+
+  currentGroove = {
+    points: [{ x: e.clientX, y: e.clientY }],
+    width: tool === 'rake-thin' ? 30 : 60,
+    tines: tool === 'rake-thin' ? 3 : 5,
+  };
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+
+  if (!drawing) return;
+
+  if (tool === 'smooth') {
+    // Smooth tool: remove groove points near cursor
+    const r = 40;
+    for (const g of grooves) {
+      g.points = g.points.filter(p => {
+        const dx = p.x - e.clientX, dy = p.y - e.clientY;
+        return dx*dx + dy*dy > r*r;
+      });
+    }
+    grooves = grooves.filter(g => g.points.length > 1);
+    redraw();
+    return;
+  }
+
+  if (currentGroove) {
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    if (dx*dx + dy*dy > 16) {
+      currentGroove.points.push({ x: e.clientX, y: e.clientY });
+      lastX = e.clientX;
+      lastY = e.clientY;
+      redraw();
+      grooves = grooves.filter(g => g !== currentGroove);
+      grooves.push(currentGroove);
+      drawGroove(currentGroove);
+    }
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  drawing = false;
+  if (currentGroove && currentGroove.points.length > 1) {
+    if (!grooves.includes(currentGroove)) grooves.push(currentGroove);
+  }
+  currentGroove = null;
+});
+
+// Touch support
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: t.clientX, clientY: t.clientY }));
+});
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const t = e.touches[0];
+  canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY }));
+});
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  canvas.dispatchEvent(new MouseEvent('mouseup'));
+});
+
+// Tool buttons
+document.querySelectorAll('.btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const t = btn.dataset.tool;
+    if (t === 'clear') {
+      grooves = [];
+      stones = [];
+      redraw();
+      return;
+    }
+    tool = t;
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Update cursor
+    if (t === 'stone') {
+      cursor.style.width = '16px'; cursor.style.height = '16px';
+      cursor.style.borderRadius = '40% 50%';
+      cursor.style.background = 'rgba(120,110,95,0.6)';
+    } else if (t === 'smooth') {
+      cursor.style.width = '40px'; cursor.style.height = '40px';
+      cursor.style.borderRadius = '50%';
+      cursor.style.background = 'rgba(210,195,165,0.3)';
+      cursor.style.border = '1px solid rgba(210,195,165,0.4)';
+    } else {
+      cursor.style.width = '8px'; cursor.style.height = '8px';
+      cursor.style.borderRadius = '50%';
+      cursor.style.background = 'rgba(200,184,154,0.6)';
+      cursor.style.border = 'none';
+    }
+  });
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.key === '1') document.querySelector('[data-tool="rake-thin"]').click();
+  if (e.key === '2') document.querySelector('[data-tool="rake-wide"]').click();
+  if (e.key === '3') document.querySelector('[data-tool="smooth"]').click();
+  if (e.key === '4') document.querySelector('[data-tool="stone"]').click();
+  if (e.key === 'r' || e.key === 'R') document.querySelector('[data-tool="clear"]').click();
+});
+
+window.addEventListener('resize', resize);
+resize();
+
+// Place a few default stones for a nice starting composition
+stones.push(makeStone(W * 0.65, H * 0.4));
+stones.push(makeStone(W * 0.68, H * 0.45));
+stones.push(makeStone(W * 0.35, H * 0.6));
+redraw();
+</script>
+</body>
+</html>

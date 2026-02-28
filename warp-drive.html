@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚀 WARP DRIVE — Into the Void</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    cursor: none;
+  }
+  canvas { display: block; }
+  #ui {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(180,160,255,0.25);
+    border-radius: 40px;
+    padding: 12px 24px;
+    backdrop-filter: blur(10px);
+    transition: opacity 0.5s;
+    z-index: 10;
+  }
+  #ui.hidden { opacity: 0; pointer-events: none; }
+  .ui-label {
+    color: rgba(180,160,255,0.7);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  #speed-slider {
+    -webkit-appearance: none;
+    width: 140px;
+    height: 3px;
+    background: rgba(180,160,255,0.3);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  #speed-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #b4a0ff;
+    cursor: pointer;
+    box-shadow: 0 0 8px #b4a0ff;
+  }
+  .btn {
+    background: rgba(180,160,255,0.12);
+    border: 1px solid rgba(180,160,255,0.3);
+    color: rgba(180,160,255,0.9);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .btn:hover { background: rgba(180,160,255,0.25); border-color: rgba(180,160,255,0.6); }
+  .btn.active { background: rgba(180,160,255,0.35); border-color: #b4a0ff; color: #fff; box-shadow: 0 0 10px rgba(180,160,255,0.4); }
+  #warp-btn {
+    background: rgba(180,160,255,0.2);
+    border-color: rgba(180,160,255,0.5);
+    font-size: 12px;
+    padding: 7px 18px;
+    font-weight: bold;
+  }
+  #warp-btn.engaged { background: rgba(255,120,200,0.25); border-color: rgba(255,120,200,0.6); color: #ffaee0; box-shadow: 0 0 15px rgba(255,100,180,0.4); }
+  #hud {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+  #hud.hidden { opacity: 0; }
+  #speed-display {
+    color: rgba(180,160,255,0.6);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  #warp-label {
+    color: rgba(255,255,255,0);
+    font-size: 22px;
+    font-weight: bold;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    transition: color 0.5s, text-shadow 0.5s;
+  }
+  #warp-label.visible {
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 0 30px rgba(180,160,255,0.8), 0 0 60px rgba(180,160,255,0.4);
+  }
+  #hint {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(180,160,255,0.3);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    pointer-events: none;
+    transition: opacity 1s;
+    z-index: 10;
+  }
+  #hint.hidden { opacity: 0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="speed-display">SPEED: <span id="speed-val">0</span> LY/s</div>
+  <div id="warp-label">WARP ENGAGED</div>
+</div>
+<div id="ui">
+  <span class="ui-label">Speed</span>
+  <input type="range" id="speed-slider" min="0" max="100" value="30">
+  <button class="btn" id="color-btn">🎨 Color</button>
+  <button class="btn" id="sound-btn">🔇 Sound</button>
+  <button class="btn active" id="nebula-btn">🌌 Nebula</button>
+  <button class="btn" id="warp-btn">⚡ WARP JUMP</button>
+</div>
+<div id="hint">HOLD SPACE TO ACCELERATE · MOVE MOUSE TO STEER</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let W, H, cx, cy;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  cx = W / 2;
+  cy = H / 2;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// === STARS ===
+const NUM_STARS = 900;
+const stars = [];
+
+function randRange(a, b) { return a + Math.random() * (b - a); }
+
+class Star {
+  constructor(reset = false) {
+    this.reset(reset);
+  }
+  reset(fromCenter = false) {
+    if (fromCenter) {
+      this.x = randRange(-0.1, 0.1);
+      this.y = randRange(-0.1, 0.1);
+    } else {
+      this.x = randRange(-1, 1);
+      this.y = randRange(-1, 1);
+    }
+    this.z = Math.random();
+    this.pz = this.z;
+    this.size = randRange(0.4, 1.4);
+    this.color = pickStarColor();
+    this.tail = { x: this.x, y: this.y, z: this.z };
+  }
+}
+
+// Color palettes
+const PALETTES = [
+  { name: 'Cosmic', colors: ['#ffffff', '#d0d0ff', '#b4a0ff', '#80c0ff', '#ffccff'] },
+  { name: 'Hyperdrive', colors: ['#ffffff', '#aaeeff', '#00ffee', '#66ffdd', '#ffffff'] },
+  { name: 'Nebula', colors: ['#ffffff', '#ffccaa', '#ffaacc', '#ccaaff', '#aaccff'] },
+  { name: 'Void', colors: ['#ffffff', '#cccccc', '#aaaaaa', '#888888', '#ffffff'] },
+];
+let paletteIdx = 0;
+function pickStarColor() {
+  const p = PALETTES[paletteIdx];
+  return p.colors[Math.floor(Math.random() * p.colors.length)];
+}
+
+for (let i = 0; i < NUM_STARS; i++) stars.push(new Star());
+
+// === NEBULA CLOUDS ===
+let nebulaEnabled = true;
+const nebulas = [];
+function genNebulas() {
+  nebulas.length = 0;
+  const colors = ['rgba(80,20,120,', 'rgba(20,60,120,', 'rgba(120,20,80,', 'rgba(20,100,100,'];
+  for (let i = 0; i < 5; i++) {
+    nebulas.push({
+      x: randRange(0.1, 0.9),
+      y: randRange(0.1, 0.9),
+      r: randRange(0.15, 0.35),
+      color: colors[Math.floor(Math.random() * colors.length)],
+      drift: { x: randRange(-0.0001, 0.0001), y: randRange(-0.0001, 0.0001) }
+    });
+  }
+}
+genNebulas();
+
+// === SPEED & CONTROLS ===
+let targetSpeed = 0.30;
+let currentSpeed = 0.15;
+let warpJumping = false;
+let warpTimer = 0;
+let spaceHeld = false;
+
+const slider = document.getElementById('speed-slider');
+slider.addEventListener('input', () => {
+  targetSpeed = slider.value / 100;
+});
+
+// Mouse steering
+let mouseX = 0, mouseY = 0;
+let targetOffsetX = 0, targetOffsetY = 0;
+let currentOffsetX = 0, currentOffsetY = 0;
+window.addEventListener('mousemove', e => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  targetOffsetX = (e.clientX - W/2) / W * 0.08;
+  targetOffsetY = (e.clientY - H/2) / H * 0.08;
+});
+
+// Space bar
+window.addEventListener('keydown', e => { if (e.code === 'Space') { spaceHeld = true; e.preventDefault(); } });
+window.addEventListener('keyup', e => { if (e.code === 'Space') spaceHeld = false; });
+
+// Warp jump
+const warpBtn = document.getElementById('warp-btn');
+const warpLabel = document.getElementById('warp-label');
+warpBtn.addEventListener('click', () => {
+  if (!warpJumping) {
+    warpJumping = true;
+    warpTimer = 3.5;
+    warpBtn.classList.add('engaged');
+    warpBtn.textContent = '💫 JUMPING...';
+    warpLabel.classList.add('visible');
+    // Spawn a burst of new stars from center during jump
+    for (let i = 0; i < 200; i++) {
+      stars.push(new Star(true));
+      if (stars.length > NUM_STARS + 300) stars.shift();
+    }
+  }
+});
+
+// Color toggle
+const colorBtn = document.getElementById('color-btn');
+colorBtn.addEventListener('click', () => {
+  paletteIdx = (paletteIdx + 1) % PALETTES.length;
+  colorBtn.textContent = '🎨 ' + PALETTES[paletteIdx].name;
+  stars.forEach(s => s.color = pickStarColor());
+  genNebulas();
+});
+
+// Nebula toggle
+const nebulaBtn = document.getElementById('nebula-btn');
+nebulaBtn.addEventListener('click', () => {
+  nebulaEnabled = !nebulaEnabled;
+  nebulaBtn.classList.toggle('active', nebulaEnabled);
+});
+
+// === SOUND (Web Audio) ===
+let audioCtx = null;
+let engineNode = null, engineGain = null;
+let soundEnabled = false;
+const soundBtn = document.getElementById('sound-btn');
+
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  engineGain = audioCtx.createGain();
+  engineGain.gain.value = 0;
+  engineGain.connect(audioCtx.destination);
+
+  // Low rumble: two detuned oscillators + noise
+  const osc1 = audioCtx.createOscillator();
+  osc1.type = 'sawtooth';
+  osc1.frequency.value = 40;
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = 'sine';
+  osc2.frequency.value = 60;
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 200;
+
+  // Noise buffer
+  const bufLen = audioCtx.sampleRate * 2;
+  const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buf;
+  noise.loop = true;
+  const noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = 120;
+  noiseFilter.Q.value = 0.5;
+  const noiseGain = audioCtx.createGain();
+  noiseGain.gain.value = 0.12;
+
+  osc1.connect(filter);
+  osc2.connect(filter);
+  filter.connect(engineGain);
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(engineGain);
+
+  osc1.start();
+  osc2.start();
+  noise.start();
+  engineNode = { osc1, osc2, filter, noiseFilter };
+}
+
+soundBtn.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  if (soundEnabled) {
+    if (!audioCtx) initAudio();
+    engineGain.gain.setTargetAtTime(0.18, audioCtx.currentTime, 0.5);
+    soundBtn.textContent = '🔊 Sound';
+    soundBtn.classList.add('active');
+  } else {
+    engineGain && engineGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
+    soundBtn.textContent = '🔇 Sound';
+    soundBtn.classList.remove('active');
+  }
+});
+
+// === HUD & UI hide ===
+let uiTimeout;
+const ui = document.getElementById('ui');
+const hud = document.getElementById('hud');
+const hint = document.getElementById('hint');
+let uiVisible = true;
+
+function showUI() {
+  ui.classList.remove('hidden');
+  uiVisible = true;
+  clearTimeout(uiTimeout);
+  uiTimeout = setTimeout(() => {
+    ui.classList.add('hidden');
+    uiVisible = false;
+  }, 4000);
+}
+window.addEventListener('mousemove', showUI);
+window.addEventListener('keydown', showUI);
+showUI();
+
+// Speed display
+const speedVal = document.getElementById('speed-val');
+
+// === MAIN LOOP ===
+let last = performance.now();
+
+function draw(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  // Speed blending
+  let tgt = targetSpeed;
+  if (spaceHeld) tgt = Math.min(1, targetSpeed + 0.5);
+  if (warpJumping) {
+    warpTimer -= dt;
+    tgt = 1;
+    if (warpTimer <= 0) {
+      warpJumping = false;
+      warpBtn.classList.remove('engaged');
+      warpBtn.textContent = '⚡ WARP JUMP';
+      warpLabel.classList.remove('visible');
+    }
+  }
+
+  currentSpeed += (tgt - currentSpeed) * (1 - Math.exp(-dt * 3));
+  const spd = currentSpeed;
+
+  // Steering drift
+  currentOffsetX += (targetOffsetX - currentOffsetX) * (1 - Math.exp(-dt * 2));
+  currentOffsetY += (targetOffsetY - currentOffsetY) * (1 - Math.exp(-dt * 2));
+
+  // Audio engine pitch tracks speed
+  if (soundEnabled && audioCtx && engineNode) {
+    const freq = 40 + spd * 160;
+    engineNode.osc1.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.3);
+    engineNode.osc2.frequency.setTargetAtTime(freq * 1.5, audioCtx.currentTime, 0.3);
+    engineNode.noiseFilter.frequency.setTargetAtTime(80 + spd * 300, audioCtx.currentTime, 0.3);
+    engineGain.gain.setTargetAtTime(soundEnabled ? 0.05 + spd * 0.18 : 0, audioCtx.currentTime, 0.3);
+  }
+
+  // HUD speed display
+  speedVal.textContent = Math.round(spd * 9999).toLocaleString();
+
+  // Draw background
+  // Deep space gradient
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.8);
+  grad.addColorStop(0, warpJumping ? '#18003a' : '#000008');
+  grad.addColorStop(1, '#000000');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Nebula clouds (slow drift)
+  if (nebulaEnabled) {
+    nebulas.forEach(n => {
+      n.x += n.drift.x * (1 + spd * 2);
+      n.y += n.drift.y * (1 + spd * 2);
+      if (n.x < -0.2 || n.x > 1.2) n.drift.x *= -1;
+      if (n.y < -0.2 || n.y > 1.2) n.drift.y *= -1;
+      const nx = n.x * W, ny = n.y * H, nr = n.r * Math.min(W, H);
+      const ng = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr);
+      const opacity = warpJumping ? 0.04 : (0.06 + spd * 0.04);
+      ng.addColorStop(0, n.color + opacity + ')');
+      ng.addColorStop(1, n.color + '0)');
+      ctx.fillStyle = ng;
+      ctx.beginPath();
+      ctx.arc(nx, ny, nr, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // Center glow (engine light) — stronger at high speed
+  if (spd > 0.2) {
+    const engineGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 200 * spd);
+    const warpColor = warpJumping ? '255,120,200' : '180,160,255';
+    engineGlow.addColorStop(0, `rgba(${warpColor},${0.12 * spd})`);
+    engineGlow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = engineGlow;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Update + draw stars
+  const warpStretch = warpJumping ? 3 : 1;
+  const zSpd = spd * 0.018 * warpStretch;
+  const aspect = W / H;
+
+  for (let i = stars.length - 1; i >= 0; i--) {
+    const s = stars[i];
+    s.pz = s.z;
+    s.z -= zSpd;
+
+    if (s.z <= 0.001) {
+      stars.splice(i, 1);
+      stars.push(new Star(true));
+      continue;
+    }
+
+    // Project to screen
+    const scale = 1 / s.z;
+    const sx = (s.x + currentOffsetX) * scale * W * 0.5 + cx;
+    const sy = (s.y + currentOffsetY) * scale * H * 0.5 + cy;
+
+    // Previous position (for tail)
+    const pScale = 1 / s.pz;
+    const px = (s.x + currentOffsetX) * pScale * W * 0.5 + cx;
+    const py = (s.y + currentOffsetY) * pScale * H * 0.5 + cy;
+
+    // Size based on distance + speed
+    const sz = s.size * (1 - s.z) * (1 + spd * 2);
+    const brightness = Math.min(1, (1 - s.z) * 1.2);
+    const alpha = Math.min(1, brightness + spd * 0.3);
+
+    // Tail length proportional to speed and z
+    const tailLen = Math.hypot(sx - px, sy - py);
+
+    if (tailLen > 1.5 && spd > 0.05) {
+      // Draw streaking tail
+      const grad2 = ctx.createLinearGradient(px, py, sx, sy);
+      grad2.addColorStop(0, 'rgba(0,0,0,0)');
+      grad2.addColorStop(1, s.color.replace('#', 'rgba(').replace(/([0-9a-f]{2})/gi, (m, hex) => parseInt(hex, 16) + ',').replace(/,$/, `,${alpha})`));
+      // Simpler: just use color with alpha
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(sx, sy);
+      ctx.strokeStyle = hexToRGBA(s.color, alpha * 0.9);
+      ctx.lineWidth = sz * 0.7;
+      ctx.stroke();
+    }
+
+    // Star dot
+    if (sz > 0.3) {
+      ctx.beginPath();
+      ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+      ctx.fillStyle = hexToRGBA(s.color, alpha);
+      ctx.fill();
+
+      // Glow at high brightness
+      if (brightness > 0.6 && sz > 0.8) {
+        const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, sz * 4);
+        glow.addColorStop(0, hexToRGBA(s.color, 0.3 * brightness));
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(sx, sy, sz * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // Vignette
+  const vig = ctx.createRadialGradient(cx, cy, Math.min(W,H)*0.2, cx, cy, Math.max(W,H)*0.75);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+
+  // Custom cursor
+  if (mouseX || mouseY) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(180,160,255,${0.4 + spd * 0.4})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(mouseX, mouseY, 6 + spd * 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(mouseX, mouseY, 2, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(180,160,255,${0.8})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  requestAnimationFrame(draw);
+}
+
+function hexToRGBA(hex, alpha) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+requestAnimationFrame(draw);
+
+// Hide hint after 6s
+setTimeout(() => hint.classList.add('hidden'), 6000);
+</script>
+</body>
+</html>

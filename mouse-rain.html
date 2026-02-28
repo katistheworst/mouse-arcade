@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mouse Rain — Digital Downpour</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;overflow:hidden;font-family:'Courier New',monospace;cursor:none}
+canvas{display:block}
+#ui{position:fixed;top:16px;right:16px;z-index:10;display:flex;flex-direction:column;gap:8px;opacity:0;transition:opacity .4s}
+body:hover #ui,body:active #ui{opacity:1}
+.btn{background:rgba(180,160,255,.12);border:1px solid rgba(180,160,255,.25);color:#b4a0ff;padding:8px 14px;border-radius:8px;font:13px 'Courier New',monospace;cursor:pointer;backdrop-filter:blur(8px);transition:all .2s;text-align:left}
+.btn:hover{background:rgba(180,160,255,.22);border-color:#b4a0ff}
+.btn.active{background:rgba(180,160,255,.25);border-color:#d4c0ff}
+#title{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(180,160,255,.06);font-size:min(8vw,80px);font-weight:bold;letter-spacing:8px;pointer-events:none;z-index:1;text-transform:uppercase;white-space:nowrap}
+#cursor{position:fixed;width:16px;height:16px;border-radius:50%;pointer-events:none;z-index:20;mix-blend-mode:screen;transition:transform .1s}
+#info{position:fixed;bottom:16px;left:16px;color:rgba(180,160,255,.3);font:11px 'Courier New',monospace;z-index:10;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="title">MOUSE RAIN</div>
+<div id="cursor"></div>
+<div id="ui">
+  <button class="btn active" onclick="setTheme(0)">💜 Purple Haze</button>
+  <button class="btn" onclick="setTheme(1)">💚 Matrix Green</button>
+  <button class="btn" onclick="setTheme(2)">🧡 Ember</button>
+  <button class="btn" onclick="setTheme(3)">🩵 Cyber Cyan</button>
+  <button class="btn" onclick="setTheme(4)">🩷 Sakura</button>
+  <button class="btn" onclick="setDensity()">⚡ Density: Normal</button>
+  <button class="btn" onclick="toggleMsg()">🐭 Secret Message: OFF</button>
+</div>
+<div id="info">move cursor to interact · hover edges for controls</div>
+
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let W,H,cols,drops,speeds,lengths,charSets;
+const MOUSE_CHARS='eekbikcchitdeetmeekfweegikhumiikjitkikmiklipmuunikookuupikritsiktikuukvixwipyeezik🐭🧀'.split('');
+const KANJI='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'.split('');
+const MIXED=[...MOUSE_CHARS,...'0123456789'.split(''),...'mouse cheese squeak eek'.split('')];
+
+const themes=[
+  {name:'Purple Haze',head:'#e8d0ff',body:'#b4a0ff',tail:'#6b4d9e',bg:'rgba(10,10,18,',cursor:'#b4a0ff'},
+  {name:'Matrix Green',head:'#ffffff',body:'#00ff41',tail:'#005500',bg:'rgba(0,8,0,',cursor:'#00ff41'},
+  {name:'Ember',head:'#ffe0a0',body:'#ff8c42',tail:'#8b2500',bg:'rgba(18,8,4,',cursor:'#ff8c42'},
+  {name:'Cyber Cyan',head:'#ffffff',body:'#00e5ff',tail:'#005566',bg:'rgba(4,12,16,',cursor:'#00e5ff'},
+  {name:'Sakura',head:'#ffffff',body:'#ffb0d0',tail:'#8b4060',bg:'rgba(16,8,12,',cursor:'#ffb0d0'},
+];
+let theme=0,density=1,secretMsg=false,mouseX=-100,mouseY=-100;
+const SECRET='THE CHEESE IS MINE';
+let secretCols=[];
+
+function resize(){
+  W=C.width=innerWidth;H=C.height=innerHeight;
+  const fs=Math.max(12,Math.min(18,W/80|0));
+  C.style.fontSize=fs+'px';
+  cols=Math.ceil(W/fs);
+  initDrops();
+}
+
+function initDrops(){
+  drops=new Array(cols);speeds=new Array(cols);lengths=new Array(cols);charSets=new Array(cols);
+  for(let i=0;i<cols;i++)resetDrop(i);
+  // secret message columns
+  if(secretMsg){
+    secretCols=[];
+    const start=Math.floor((cols-SECRET.length)/2);
+    for(let i=0;i<SECRET.length;i++)secretCols.push(start+i);
+  }
+}
+
+function resetDrop(i){
+  drops[i]=-Math.random()*H/14-1;
+  speeds[i]=.3+Math.random()*1.2*density;
+  lengths[i]=8+Math.random()*25|0;
+  charSets[i]=Math.random()>.5?MOUSE_CHARS:MIXED;
+}
+
+function setTheme(t){
+  theme=t;
+  document.querySelectorAll('.btn').forEach((b,i)=>i<5?b.classList.toggle('active',i===t):0);
+}
+
+function setDensity(){
+  density=density>=2?.5:density+.5;
+  const labels={0.5:'Sparse',1:'Normal',1.5:'Dense',2:'Flood'};
+  document.querySelectorAll('.btn')[5].textContent='⚡ Density: '+(labels[density]||'Normal');
+  initDrops();
+}
+
+function toggleMsg(){
+  secretMsg=!secretMsg;
+  document.querySelectorAll('.btn')[6].textContent='🐭 Secret Message: '+(secretMsg?'ON':'OFF');
+  initDrops();
+}
+
+const fs=()=>Math.max(12,Math.min(18,W/80|0));
+
+function draw(){
+  const t=themes[theme],f=fs();
+  // Trail fade
+  X.fillStyle=t.bg+(.06+density*.02)+')';
+  X.fillRect(0,0,W,H);
+  
+  X.font=f+'px Courier New';
+  X.textAlign='center';
+  
+  // Mouse interaction — brighten nearby columns
+  const mouseCol=Math.floor(mouseX/f);
+  const mouseRow=Math.floor(mouseY/f);
+  
+  for(let i=0;i<cols;i++){
+    const x=i*f+f/2;
+    const y=drops[i]*f;
+    
+    // Secret message override
+    if(secretMsg && secretCols.includes(i)){
+      const si=secretCols.indexOf(i);
+      const ch=SECRET[si];
+      const row=Math.floor(H/2/f);
+      X.fillStyle=t.head;
+      X.globalAlpha=.6+Math.sin(Date.now()/500+si)*.4;
+      X.fillText(ch,x,row*f);
+      X.globalAlpha=1;
+    }
+    
+    // Distance from mouse
+    const dx=i-mouseCol,dy=drops[i]-mouseRow;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const nearMouse=dist<8;
+    
+    // Draw trail
+    for(let j=0;j<lengths[i];j++){
+      const row=Math.floor(drops[i])-j;
+      if(row<0||row*f>H)continue;
+      const py=row*f;
+      
+      let ch;
+      if(j===0){
+        // Head — bright
+        ch=charSets[i][Math.random()*charSets[i].length|0];
+        X.fillStyle=t.head;
+        X.globalAlpha=nearMouse?1:.95;
+        // Glow
+        X.shadowColor=t.body;
+        X.shadowBlur=nearMouse?16:8;
+      }else{
+        // Flicker: occasionally change character
+        ch=(Math.random()>.92)?charSets[i][Math.random()*charSets[i].length|0]:charSets[i][(row+j*7)%charSets[i].length];
+        const fade=1-j/lengths[i];
+        if(fade>.5){
+          X.fillStyle=t.body;
+          X.globalAlpha=fade*(nearMouse?1.2:.8);
+        }else{
+          X.fillStyle=t.tail;
+          X.globalAlpha=fade*(nearMouse?1:.6);
+        }
+        X.shadowBlur=0;
+      }
+      
+      X.fillText(ch,x,py);
+    }
+    
+    X.shadowBlur=0;
+    X.globalAlpha=1;
+    
+    // Advance
+    drops[i]+=speeds[i];
+    
+    // Reset when off screen
+    if((drops[i]-lengths[i])*f>H){
+      resetDrop(i);
+    }
+  }
+  
+  requestAnimationFrame(draw);
+}
+
+// Cursor
+document.addEventListener('mousemove',e=>{
+  mouseX=e.clientX;mouseY=e.clientY;
+  const cur=document.getElementById('cursor');
+  cur.style.left=e.clientX-8+'px';
+  cur.style.top=e.clientY-8+'px';
+  cur.style.background=themes[theme].cursor;
+  cur.style.boxShadow=`0 0 12px ${themes[theme].cursor}`;
+});
+
+// Click ripple — speed up nearby columns temporarily
+document.addEventListener('click',e=>{
+  const col=Math.floor(e.clientX/fs());
+  for(let i=Math.max(0,col-6);i<Math.min(cols,col+6);i++){
+    speeds[i]=Math.min(speeds[i]*2.5,4);
+    setTimeout(()=>speeds[i]=.3+Math.random()*1.2*density,1500);
+  }
+});
+
+window.addEventListener('resize',resize);
+resize();
+draw();
+</script>
+</body>
+</html>
