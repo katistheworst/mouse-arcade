@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐭 Mouse-a-Sketch</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+canvas#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+.frame{position:relative;z-index:1;background:linear-gradient(145deg,#cc3333,#aa2222);border-radius:24px;padding:20px 24px 40px;box-shadow:0 8px 40px rgba(0,0,0,.5),inset 0 2px 0 rgba(255,255,255,.15);max-width:520px;width:95vw}
+.brand{text-align:center;font-size:14px;font-weight:700;color:#ffcc00;letter-spacing:4px;text-transform:uppercase;margin-bottom:10px;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.brand span{font-style:italic;font-size:11px;letter-spacing:1px;display:block;color:#ffdd66;margin-top:2px}
+.screen-border{background:#555;border-radius:8px;padding:4px;box-shadow:inset 0 2px 8px rgba(0,0,0,.5)}
+.screen{background:#b8c8a0;border-radius:4px;display:block;cursor:crosshair;image-rendering:pixelated}
+.controls{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:0 8px}
+.knob-area{display:flex;flex-direction:column;align-items:center;gap:4px}
+.knob-label{font-size:9px;color:#ffcc00;letter-spacing:2px;text-transform:uppercase;font-weight:600}
+.knob{width:56px;height:56px;background:linear-gradient(145deg,#eee,#bbb);border-radius:50%;border:3px solid #999;cursor:grab;position:relative;box-shadow:0 4px 12px rgba(0,0,0,.3),inset 0 2px 4px rgba(255,255,255,.6)}
+.knob:active{cursor:grabbing}
+.knob::after{content:'';position:absolute;top:6px;left:50%;transform:translateX(-50%);width:4px;height:12px;background:#666;border-radius:2px}
+.knob.active{box-shadow:0 4px 12px rgba(0,0,0,.3),inset 0 2px 4px rgba(255,255,255,.6),0 0 12px rgba(255,204,0,.4)}
+.shake-btn{background:linear-gradient(145deg,#ffcc00,#ff9900);border:none;color:#882200;font-weight:700;font-size:12px;padding:8px 16px;border-radius:20px;cursor:pointer;letter-spacing:1px;box-shadow:0 3px 8px rgba(0,0,0,.3);transition:transform .1s}
+.shake-btn:hover{transform:scale(1.05)}
+.shake-btn:active{transform:scale(.95)}
+.info{text-align:center;margin-top:8px;font-size:10px;color:#ffdd88;opacity:.7}
+.shaking{animation:shake .4s ease-in-out}
+@keyframes shake{0%,100%{transform:rotate(0)}15%{transform:rotate(-3deg) translateX(-4px)}30%{transform:rotate(2deg) translateX(3px)}45%{transform:rotate(-2deg) translateX(-3px)}60%{transform:rotate(1.5deg) translateX(2px)}75%{transform:rotate(-1deg) translateX(-1px)}}
+.line-controls{display:flex;gap:6px;flex-direction:column;align-items:center}
+.line-label{font-size:9px;color:#ffcc00;letter-spacing:1px}
+.line-btns{display:flex;gap:4px}
+.line-btn{width:24px;height:24px;border-radius:50%;border:2px solid #999;cursor:pointer;transition:transform .1s}
+.line-btn:hover{transform:scale(1.1)}
+.line-btn.active{border-color:#ffcc00;box-shadow:0 0 8px rgba(255,204,0,.5)}
+.line-thin{background:#555}
+.line-med{background:#333}
+.line-thick{background:#111}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="frame" id="frame">
+<div class="brand">Mouse-a-Sketch<span>A Classic Toy for Digital Mice</span></div>
+<div class="screen-border">
+<canvas class="screen" id="screen" width="460" height="360"></canvas>
+</div>
+<div class="controls">
+<div class="knob-area">
+<div class="knob" id="knobL"></div>
+<div class="knob-label">← →</div>
+</div>
+<div class="line-controls">
+<div class="line-btns">
+<div class="line-btn line-thin" data-size="1"></div>
+<div class="line-btn line-med active" data-size="2"></div>
+<div class="line-btn line-thick" data-size="3"></div>
+</div>
+<button class="shake-btn" id="shakeBtn">🫨 SHAKE</button>
+</div>
+<div class="knob-area">
+<div class="knob" id="knobR"></div>
+<div class="knob-label">↑ ↓</div>
+</div>
+</div>
+<div class="info">Arrow keys / WASD to draw · Scroll knobs · S = save · Space = shake</div>
+</div>
+
+<script>
+const sc=document.getElementById('stars'),sctx=sc.getContext('2d');
+sc.width=innerWidth;sc.height=innerHeight;
+const stars=Array.from({length:200},()=>({x:Math.random()*sc.width,y:Math.random()*sc.height,r:Math.random()*1.5+.5,b:Math.random(),s:Math.random()*.02+.005}));
+function drawStars(){sctx.clearRect(0,0,sc.width,sc.height);stars.forEach(s=>{s.b+=s.s;if(s.b>1||s.b<0)s.s*=-1;sctx.globalAlpha=s.b*.6+.2;sctx.fillStyle='#fff';sctx.beginPath();sctx.arc(s.x,s.y,s.r,0,Math.PI*2);sctx.fill()});sctx.globalAlpha=1;requestAnimationFrame(drawStars)}
+drawStars();
+
+const cv=document.getElementById('screen'),ctx=cv.getContext('2d');
+const W=460,H=360;
+let px=W/2,py=H/2,lineW=2;
+const screenColor='#b8c8a0',lineColor='#444';
+
+ctx.fillStyle=screenColor;ctx.fillRect(0,0,W,H);
+ctx.strokeStyle=lineColor;ctx.lineCap='round';ctx.lineJoin='round';
+ctx.lineWidth=lineW;
+
+function moveTo(nx,ny){
+nx=Math.max(1,Math.min(W-1,nx));
+ny=Math.max(1,Math.min(H-1,ny));
+ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(nx,ny);ctx.lineWidth=lineW;ctx.stroke();
+px=nx;py=ny;
+}
+
+// Keyboard
+const keys={};
+document.addEventListener('keydown',e=>{
+keys[e.key]=true;
+if(e.key===' '){e.preventDefault();shake()}
+if(e.key==='s'||e.key==='S'){e.preventDefault();save()}
+});
+document.addEventListener('keyup',e=>keys[e.key]=false);
+
+const spd=2;
+function tick(){
+let dx=0,dy=0;
+if(keys['ArrowLeft']||keys['a']||keys['A'])dx=-spd;
+if(keys['ArrowRight']||keys['d']||keys['D'])dx=spd;
+if(keys['ArrowUp']||keys['w']||keys['W'])dy=-spd;
+if(keys['ArrowDown']||keys['s']&&!keys['S']||keys['S']&&keys['Shift'])dy=spd;
+// fix: s without shift = save, with arrow = move
+if(keys['s']&&(keys['ArrowDown']||keys['ArrowUp']||keys['ArrowLeft']||keys['ArrowRight']))dy=spd;
+if(dx||dy)moveTo(px+dx,py+dy);
+requestAnimationFrame(tick);
+}
+tick();
+
+// Knob rotation
+let knobLAngle=0,knobRAngle=0;
+const knobL=document.getElementById('knobL'),knobR=document.getElementById('knobR');
+
+function setupKnob(el,axis){
+let dragging=false,lastY=0;
+el.addEventListener('pointerdown',e=>{dragging=true;lastY=e.clientY;el.setPointerCapture(e.pointerId);el.classList.add('active')});
+el.addEventListener('pointermove',e=>{
+if(!dragging)return;
+const dy=lastY-e.clientY;
+lastY=e.clientY;
+if(axis==='x')moveTo(px+dy,py);
+else moveTo(px,py-dy);
+const a=axis==='x'?knobLAngle+=dy*3:knobRAngle+=dy*3;
+el.style.transform=`rotate(${axis==='x'?knobLAngle:knobRAngle}deg)`;
+});
+el.addEventListener('pointerup',()=>{dragging=false;el.classList.remove('active')});
+el.addEventListener('wheel',e=>{
+e.preventDefault();
+const d=e.deltaY>0?3:-3;
+if(axis==='x'){moveTo(px+d,py);knobLAngle+=d*5;el.style.transform=`rotate(${knobLAngle}deg)`}
+else{moveTo(px,py+d);knobRAngle+=d*5;el.style.transform=`rotate(${knobRAngle}deg)`}
+},{passive:false});
+}
+setupKnob(knobL,'x');
+setupKnob(knobR,'y');
+
+// Direct drawing on screen
+let drawing=false;
+cv.addEventListener('pointerdown',e=>{
+const r=cv.getBoundingClientRect();
+px=(e.clientX-r.left)*(W/r.width);
+py=(e.clientY-r.top)*(H/r.height);
+drawing=true;cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove',e=>{
+if(!drawing)return;
+const r=cv.getBoundingClientRect();
+moveTo((e.clientX-r.left)*(W/r.width),(e.clientY-r.top)*(H/r.height));
+});
+cv.addEventListener('pointerup',()=>drawing=false);
+
+// Shake to clear
+function shake(){
+const f=document.getElementById('frame');
+f.classList.remove('shaking');void f.offsetWidth;f.classList.add('shaking');
+// Fade effect
+let opacity=1;
+const img=ctx.getImageData(0,0,W,H);
+function fadeStep(){
+ctx.fillStyle=screenColor;ctx.globalAlpha=.15;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;
+opacity-=.15;
+if(opacity>0)requestAnimationFrame(fadeStep);
+else{ctx.fillStyle=screenColor;ctx.fillRect(0,0,W,H);px=W/2;py=H/2}
+}
+fadeStep();
+}
+document.getElementById('shakeBtn').onclick=shake;
+
+// Line width
+document.querySelectorAll('.line-btn').forEach(b=>{
+b.onclick=()=>{
+document.querySelectorAll('.line-btn').forEach(x=>x.classList.remove('active'));
+b.classList.add('active');
+lineW=parseInt(b.dataset.size);
+};
+});
+
+// Save
+function save(){
+const a=document.createElement('a');a.download='mouse-a-sketch.png';a.href=cv.toDataURL();a.click();
+}
+</script>
+</body>
+</html>

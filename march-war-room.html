@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐭 March War Room — Sales Command Center</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a1a;color:#e0e0f0;min-height:100vh;overflow-x:hidden}
+canvas#stars{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+.container{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:20px}
+h1{text-align:center;font-size:2em;background:linear-gradient(135deg,#c084fc,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.subtitle{text-align:center;color:#a78bfa;font-size:.9em;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:rgba(30,20,50,.85);border:1px solid rgba(168,85,247,.3);border-radius:16px;padding:20px;backdrop-filter:blur(10px)}
+.card h2{font-size:1em;color:#c084fc;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.full{grid-column:1/-1}
+.metric{text-align:center;margin:8px 0}
+.metric .value{font-size:2.4em;font-weight:800;background:linear-gradient(135deg,#c084fc,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.metric .label{font-size:.8em;color:#a78bfa;margin-top:2px}
+.metric-row{display:flex;justify-content:space-around;flex-wrap:wrap;gap:8px}
+.progress-wrap{margin:12px 0}
+.progress-bar{height:24px;background:rgba(168,85,247,.15);border-radius:12px;overflow:hidden;position:relative}
+.progress-fill{height:100%;border-radius:12px;transition:width .5s ease;position:relative}
+.progress-fill.tier1{background:linear-gradient(90deg,#7c3aed,#c084fc)}
+.progress-fill.tier2{background:linear-gradient(90deg,#c084fc,#f472b6)}
+.progress-pct{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.75em;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.tier-label{display:flex;justify-content:space-between;font-size:.75em;color:#a78bfa;margin-top:4px}
+input[type=number]{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:8px;color:#e0e0f0;padding:8px 12px;font-size:1em;width:100%;margin:4px 0}
+input[type=number]:focus{outline:none;border-color:#c084fc}
+.btn{background:linear-gradient(135deg,#7c3aed,#c084fc);color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:.9em;cursor:pointer;font-weight:600;transition:transform .15s}
+.btn:hover{transform:scale(1.03)}
+.btn-sm{padding:6px 14px;font-size:.8em;border-radius:8px}
+.btn-danger{background:linear-gradient(135deg,#dc2626,#f87171)}
+.day-log{display:grid;grid-template-columns:auto 1fr auto auto;gap:6px 12px;align-items:center;max-height:260px;overflow-y:auto;font-size:.85em}
+.day-log .date{color:#a78bfa;font-size:.8em}.day-log .amt{font-weight:700;color:#c084fc}
+.day-log .del{cursor:pointer;color:#f87171;opacity:.5;font-size:.8em}.day-log .del:hover{opacity:1}
+.quote{text-align:center;font-style:italic;color:#d8b4fe;padding:12px;font-size:.95em;line-height:1.5}
+.streak{display:flex;gap:3px;justify-content:center;margin:8px 0;flex-wrap:wrap}
+.streak .day{width:18px;height:18px;border-radius:4px;font-size:.55em;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5)}
+.streak .day.future{background:rgba(168,85,247,.1)}
+.streak .day.empty{background:rgba(168,85,247,.15)}
+.streak .day.hit{background:linear-gradient(135deg,#7c3aed,#c084fc)}
+.streak .day.fire{background:linear-gradient(135deg,#f59e0b,#ef4444)}
+.streak .day.today{border:2px solid #f472b6}
+.tip{background:rgba(168,85,247,.08);border-left:3px solid #c084fc;padding:10px 14px;border-radius:0 8px 8px 0;font-size:.85em;margin:8px 0;color:#d8b4fe;line-height:1.5}
+.controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.controls>div{flex:1;min-width:100px}
+.controls label{font-size:.75em;color:#a78bfa;display:block;margin-bottom:2px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.controls{flex-direction:column}}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="container">
+<h1>🐭 March War Room</h1>
+<p class="subtitle">Sales Command Center — March 2026</p>
+
+<div class="grid">
+<!-- Commission Tracker -->
+<div class="card full">
+<h2>💰 Commission Pacing</h2>
+<div class="metric-row">
+<div class="metric"><div class="value" id="mtd">$0</div><div class="label">MTD Net Sales</div></div>
+<div class="metric"><div class="value" id="gap1">$60,000</div><div class="label">Gap to 10% Tier</div></div>
+<div class="metric"><div class="value" id="pace">$0</div><div class="label">Daily Pace Needed</div></div>
+<div class="metric"><div class="value" id="commission">$0</div><div class="label">Est. Commission</div></div>
+</div>
+<div class="progress-wrap">
+<div class="progress-bar"><div class="progress-fill tier1" id="bar1" style="width:0%"><span class="progress-pct" id="pct1">0%</span></div></div>
+<div class="tier-label"><span>$0</span><span>$60k (10%)</span><span>$165k (13.5%)</span></div>
+</div>
+</div>
+
+<!-- Daily Entry -->
+<div class="card">
+<h2>📝 Log Today's Sales</h2>
+<div class="controls">
+<div><label>Date</label><input type="date" id="logDate"></div>
+<div><label>Net Sales ($)</label><input type="number" id="logAmt" placeholder="0" min="0" step="100"></div>
+<div style="flex:0"><label>&nbsp;</label><button class="btn btn-sm" onclick="addDay()">+ Add</button></div>
+</div>
+</div>
+
+<!-- Motivation -->
+<div class="card">
+<h2>🔥 Daily Fuel</h2>
+<div class="quote" id="quote"></div>
+</div>
+
+<!-- March Heatmap -->
+<div class="card full">
+<h2>📅 March Heatmap</h2>
+<div class="streak" id="heatmap"></div>
+<p style="font-size:.7em;color:#a78bfa;text-align:center;margin-top:6px">🟪 logged · 🟧 $3k+ day · ◻️ no data · 🩷 today</p>
+</div>
+
+<!-- Daily Log -->
+<div class="card">
+<h2>📋 Daily Log</h2>
+<div class="day-log" id="dayLog"><em style="color:#a78bfa;grid-column:1/-1">No entries yet</em></div>
+</div>
+
+<!-- Strategy Tip -->
+<div class="card">
+<h2>🎯 March Strategy</h2>
+<div class="tip" id="tip"></div>
+<div style="margin-top:8px;text-align:right"><button class="btn btn-sm" onclick="nextTip()">Next tip →</button></div>
+</div>
+</div>
+
+<p style="text-align:center;color:rgba(167,139,250,.4);font-size:.7em;padding:16px">Built with 🧀 by Mouse · 1AM nightly session · Data in localStorage</p>
+</div>
+
+<script>
+// Stars
+const c=document.getElementById('stars'),x=c.getContext('2d');
+function resizeC(){c.width=innerWidth;c.height=innerHeight}
+resizeC();addEventListener('resize',resizeC);
+const stars=Array.from({length:120},()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:Math.random()*1.5+.5,a:Math.random(),s:Math.random()*.005+.002}));
+function drawStars(){x.clearRect(0,0,c.width,c.height);stars.forEach(s=>{s.a+=s.s;if(s.a>1)s.s=-Math.abs(s.s);if(s.a<0)s.s=Math.abs(s.s);x.beginPath();x.arc(s.x,s.y,s.r,0,Math.PI*2);x.fillStyle=`rgba(196,132,252,${s.a*.6})`;x.fill()});requestAnimationFrame(drawStars)}
+drawStars();
+
+// Data
+const KEY='march-war-room-2026';
+let data=JSON.parse(localStorage.getItem(KEY)||'{}');
+// data shape: { "2026-03-01": 4500, "2026-03-03": 2300, ... }
+
+const today=new Date();
+const todayStr=today.toISOString().slice(0,10);
+document.getElementById('logDate').value=todayStr;
+
+// Work days in March for Kat: Mon/Fri 8a-8p, Thu/Sat 8a-4p, Sun 12p-8p, Tue/Wed OFF
+function isWorkDay(d){const dow=d.getDay();return dow!==2&&dow!==3} // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+function remainingWorkDays(){
+  let count=0;
+  for(let d=new Date(today);d.getMonth()===2;d.setDate(d.getDate()+1)){
+    if(d>=new Date(todayStr)&&isWorkDay(d))count++;
+  }
+  return count||1;
+}
+
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+
+function addDay(){
+  const dt=document.getElementById('logDate').value;
+  const amt=parseFloat(document.getElementById('logAmt').value)||0;
+  if(!dt||!amt)return;
+  data[dt]=(data[dt]||0)+amt;
+  save();render();
+  document.getElementById('logAmt').value='';
+}
+
+function delDay(dt){if(confirm('Delete '+dt+'?')){delete data[dt];save();render()}}
+
+function render(){
+  const entries=Object.entries(data).filter(([k])=>k.startsWith('2026-03')).sort();
+  const mtd=entries.reduce((s,[,v])=>s+v,0);
+  const gap1=Math.max(0,60000-mtd);
+  const gap2=Math.max(0,165000-mtd);
+  const rwd=remainingWorkDays();
+  const pace=gap1>0?gap1/rwd:gap2>0?gap2/rwd:0;
+  const commRate=mtd>=165000?.135:mtd>=60000?.1:.035;
+  const comm=mtd*commRate;
+
+  document.getElementById('mtd').textContent='$'+mtd.toLocaleString();
+  document.getElementById('gap1').textContent=gap1>0?'$'+gap1.toLocaleString():'✅ 10% locked!';
+  document.getElementById('gap1').parentElement.querySelector('.label').textContent=gap1>0?'Gap to 10% Tier':'Tier Status';
+  document.getElementById('pace').textContent='$'+Math.round(pace).toLocaleString()+'/day';
+  document.getElementById('commission').textContent='$'+Math.round(comm).toLocaleString()+' ('+Math.round(commRate*100)+'%)';
+
+  const pct=Math.min(100,mtd/165000*100);
+  document.getElementById('bar1').style.width=pct+'%';
+  document.getElementById('bar1').className='progress-fill '+(mtd>=60000?'tier2':'tier1');
+  document.getElementById('pct1').textContent=Math.round(mtd/60000*100)+'% to 10%';
+
+  // Heatmap
+  const hm=document.getElementById('heatmap');
+  hm.innerHTML='';
+  for(let d=1;d<=31;d++){
+    const dt=new Date(2026,2,d);
+    const ds=`2026-03-${String(d).padStart(2,'0')}`;
+    const el=document.createElement('div');
+    el.className='day';
+    el.textContent=d;
+    el.title=ds;
+    if(dt>today){el.classList.add('future')}
+    else if(data[ds]){el.classList.add(data[ds]>=3000?'fire':'hit');el.title+=': $'+data[ds].toLocaleString()}
+    else{el.classList.add('empty')}
+    if(ds===todayStr)el.classList.add('today');
+    hm.appendChild(el);
+  }
+
+  // Day log
+  const dl=document.getElementById('dayLog');
+  if(entries.length===0){dl.innerHTML='<em style="color:#a78bfa;grid-column:1/-1">No entries yet — log your first day!</em>';return}
+  dl.innerHTML='';
+  entries.reverse().forEach(([dt,v])=>{
+    dl.innerHTML+=`<span class="date">${dt.slice(5)}</span><span>${new Date(dt+'T12:00').toLocaleDateString('en',{weekday:'short'})}</span><span class="amt">$${v.toLocaleString()}</span><span class="del" onclick="delDay('${dt}')">✕</span>`;
+  });
+}
+
+// Quotes
+const quotes=[
+  '"The goal isn\'t to be perfect. It\'s to be relentless." — Unknown',
+  '"Every sale starts with a conversation, not a pitch." — Sales proverb',
+  '"You miss 100% of the shots you don\'t take." — Wayne Gretzky',
+  '"March is YOUR month. Fresh scoreboard. No baggage. Let\'s go." — Mouse 🐭',
+  '"Confidence isn\'t knowing you\'ll close — it\'s knowing you\'ll be fine either way."',
+  '"The pipeline is a muscle. Work it daily." — Sales wisdom',
+  '"Be so good they can\'t ignore you." — Steve Martin',
+  '"Spring energy = new clients looking for summer prep. LHR season is NOW."',
+  '"Your February self paved the road. March self gets to run on it." — Mouse 🐭',
+  '"Stop selling treatments. Start selling confidence." — Aesthetic sales',
+  '"$60k is not the ceiling. It\'s the floor." — Mouse 🐭',
+  '"The follow-up is where the money lives."',
+];
+document.getElementById('quote').textContent=quotes[Math.floor(Math.random()*quotes.length)];
+
+// Tips
+const tips=[
+  "🌸 <b>March = Spring Prep Season.</b> Clients are thinking about summer bodies NOW. LHR, body contouring, and skin resurfacing should be your lead pitches. Plant the urgency: \"Starting now means you're ready by June.\"",
+  "📱 <b>The 3-Text Sequence.</b> After a consult that doesn't book: (1) Same day — value recap, no pressure. (2) Day 3 — address the likely objection. (3) Day 7 — limited-time hook or social proof. 3 touches, spaced out, each adding value.",
+  "💰 <b>Tier Math Trick.</b> At $59k you earn $2,065 (3.5%). At $60k you earn $6,000 (10%). That last $1k of sales is worth ~$4k in commission. NEVER leave money on the table near tier boundaries.",
+  "🎯 <b>The Assumptive Close.</b> Instead of \"Would you like to book?\" try \"Let's get you on the schedule — I have Thursday at 2 or Friday at 10, which works better?\" Give options, not questions.",
+  "🔄 <b>Refund Prevention.</b> Set expectations HARD upfront. \"You'll need 6-8 sessions for full results. Session 1-2 you might not see much — that's normal, the follicle is cycling.\" Front-load the patience.",
+  "📊 <b>Daily $2,300 Pace.</b> If you work ~26 days in March and target $60k, that's ~$2,300/day. One good consult close per day. Very doable. Two closes = tier-crushing pace.",
+  "🏃 <b>Momentum Math.</b> A strong first week (>$15k) means the rest of March can coast at a lower pace. Front-load effort. Start hard, finish smooth.",
+  "✨ <b>Clear + Brilliant Pitch for Glendale.</b> Spring = wedding season approaching. \"This is the treatment brides book 3-4 months before their wedding.\" Glendale ramp needs C+B volume.",
+];
+let tipIdx=Math.floor(Math.random()*tips.length);
+document.getElementById('tip').innerHTML=tips[tipIdx];
+function nextTip(){tipIdx=(tipIdx+1)%tips.length;document.getElementById('tip').innerHTML=tips[tipIdx]}
+
+render();
+</script>
+</body>
+</html>

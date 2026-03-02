@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tiny Piano 🐭🎹</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#1a0a2e;color:#e8d5f5;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+canvas#bg{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+.wrap{position:relative;z-index:1;width:100%;max-width:700px;padding:24px 16px 60px;display:flex;flex-direction:column;align-items:center;gap:20px}
+h1{font-size:2em;text-align:center;background:linear-gradient(135deg,#e879f9,#a855f7,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{font-size:.9em;color:#a78bba;text-align:center;margin-top:-8px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.controls button{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);color:#c4a5de;padding:7px 16px;border-radius:20px;cursor:pointer;font-size:.85em;transition:all .2s}
+.controls button:hover,.controls button.active{background:rgba(168,85,247,.4);color:#fff;border-color:#a855f7}
+.piano-frame{background:linear-gradient(135deg,rgba(88,28,135,.3),rgba(40,5,70,.5));border:2px solid rgba(168,85,247,.25);border-radius:20px;padding:24px 16px 20px;width:100%;position:relative;overflow:hidden}
+.piano-frame::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:80%;height:4px;background:linear-gradient(90deg,transparent,rgba(168,85,247,.4),transparent);border-radius:0 0 4px 4px}
+.keyboard{display:flex;position:relative;height:200px;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:none}
+.white-keys{display:flex;gap:3px}
+.white-key{width:48px;height:200px;background:linear-gradient(180deg,#f5f0ff,#e8ddf5);border:1px solid rgba(168,85,247,.2);border-radius:0 0 8px 8px;cursor:pointer;transition:background .08s;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px}
+.white-key:active,.white-key.pressed{background:linear-gradient(180deg,#d8c8f0,#c4a5de)}
+.white-key .label{font-size:.65em;color:#7c5a9a;pointer-events:none}
+.white-key .squeak{font-size:.55em;color:#a855f7;pointer-events:none;position:absolute;bottom:28px;opacity:.7}
+.black-keys{position:absolute;display:flex;pointer-events:none;height:130px;top:0}
+.black-key-spacer{width:51px;pointer-events:none}
+.black-key{width:32px;height:130px;background:linear-gradient(180deg,#2d1654,#1a0a2e);border:1px solid rgba(168,85,247,.3);border-radius:0 0 6px 6px;cursor:pointer;pointer-events:auto;transition:background .08s;margin:0 -16px;z-index:2;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px}
+.black-key:active,.black-key.pressed{background:linear-gradient(180deg,#4c2a7a,#2d1654)}
+.black-key .label{font-size:.55em;color:#7c5a9a;pointer-events:none}
+.squeak-display{height:60px;display:flex;align-items:center;justify-content:center;font-size:1.6em;color:#c084fc;text-shadow:0 0 20px rgba(168,85,247,.5);opacity:0;transition:opacity .15s}
+.squeak-display.show{opacity:1}
+.vis{width:100%;height:60px;border-radius:12px;background:rgba(88,28,135,.2);border:1px solid rgba(168,85,247,.15)}
+.options{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center}
+.options label{font-size:.8em;color:#a78bba;display:flex;align-items:center;gap:6px}
+.options input[type=range]{width:80px;accent-color:#a855f7}
+.options input[type=checkbox]{accent-color:#a855f7}
+.info{font-size:.75em;color:#5a3d7a;text-align:center;margin-top:8px}
+.sparkles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<canvas class="sparkles" id="sparkles"></canvas>
+<div class="wrap">
+<h1>🐭 Tiny Piano 🎹</h1>
+<p class="sub">a squeaky keyboard for small paws</p>
+
+<div class="controls">
+<button class="active" data-mode="squeak">🐭 Squeak</button>
+<button data-mode="bell">🔔 Bell</button>
+<button data-mode="synth">🎵 Synth</button>
+<button data-mode="bass">🎸 Bass</button>
+</div>
+
+<div class="piano-frame">
+<div class="squeak-display" id="squeakText"></div>
+<div class="keyboard" id="keyboard">
+<div class="white-keys" id="whiteKeys"></div>
+<div class="black-keys" id="blackKeys"></div>
+</div>
+</div>
+
+<canvas class="vis" id="vis" width="700" height="60"></canvas>
+
+<div class="options">
+<label>Volume <input type="range" id="vol" min="0" max="100" value="70"></label>
+<label><input type="checkbox" id="sustain"> Sustain</label>
+<label>Octave <button class="controls" style="display:inline;padding:3px 10px;font-size:.9em" id="octDown">−</button> <span id="octLabel">4</span> <button class="controls" style="display:inline;padding:3px 10px;font-size:.9em" id="octUp">+</button></label>
+</div>
+
+<p class="info">keyboard: A S D F G H J (white) · W E T Y U (black) · Z/X octave · space sustain</p>
+</div>
+
+<script>
+// Audio context
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+const masterGain=AC.createGain();
+const analyser=AC.createAnalyser();
+analyser.fftSize=256;
+masterGain.connect(analyser);
+analyser.connect(AC.destination);
+
+// Notes
+const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const SQUEAKS=['eek','bik','chit','deet','meek','fwee','gik','hiss','ik','jik','kik','lik'];
+const WHITE_INDICES=[0,2,4,5,7,9,11]; // C D E F G A B
+const BLACK_INDICES=[1,3,null,6,8,10]; // C# D# _ F# G# A#
+const WHITE_LABELS=['C','D','E','F','G','A','B'];
+const BLACK_LABELS=['C#','D#','','F#','G#','A#'];
+const KEY_MAP_WHITE=['a','s','d','f','g','h','j'];
+const KEY_MAP_BLACK=['w','e','','t','y','u'];
+
+let currentOctave=4;
+let currentMode='squeak';
+let sustainOn=false;
+let activeNotes={};
+
+function noteFreq(note,oct){return 440*Math.pow(2,(oct-4)+(note-9)/12)}
+
+function playNote(noteIdx,oct){
+if(AC.state==='suspended')AC.resume();
+const freq=noteFreq(noteIdx,oct);
+const vol=(document.getElementById('vol').value/100)*0.5;
+const t=AC.currentTime;
+
+let osc,gain;
+if(currentMode==='squeak'){
+// High-pitched mouse squeak with rapid frequency sweep
+osc=AC.createOscillator();
+gain=AC.createGain();
+const f=AC.createBiquadFilter();
+f.type='bandpass';f.frequency.value=freq*3;f.Q.value=8;
+osc.type='sine';
+osc.frequency.setValueAtTime(freq*4,t);
+osc.frequency.exponentialRampToValueAtTime(freq*2,t+0.05);
+osc.frequency.exponentialRampToValueAtTime(freq*3.5,t+0.1);
+gain.gain.setValueAtTime(vol,t);
+gain.gain.exponentialRampToValueAtTime(0.001,t+(sustainOn?.8:.25));
+osc.connect(f);f.connect(gain);gain.connect(masterGain);
+osc.start(t);osc.stop(t+(sustainOn?.8:.25));
+// Add a second harmonic for richness
+const osc2=AC.createOscillator();
+osc2.type='triangle';
+osc2.frequency.setValueAtTime(freq*6,t);
+osc2.frequency.exponentialRampToValueAtTime(freq*4,t+0.08);
+const g2=AC.createGain();
+g2.gain.setValueAtTime(vol*0.3,t);
+g2.gain.exponentialRampToValueAtTime(0.001,t+(sustainOn?.6:.15));
+osc2.connect(g2);g2.connect(masterGain);
+osc2.start(t);osc2.stop(t+(sustainOn?.6:.15));
+}else if(currentMode==='bell'){
+osc=AC.createOscillator();
+gain=AC.createGain();
+osc.type='sine';
+osc.frequency.value=freq;
+gain.gain.setValueAtTime(vol,t);
+gain.gain.exponentialRampToValueAtTime(0.001,t+(sustainOn?2:.6));
+osc.connect(gain);gain.connect(masterGain);
+osc.start(t);osc.stop(t+(sustainOn?2:.6));
+// Overtones
+[2,3,4.2].forEach((m,i)=>{
+const o=AC.createOscillator();const g=AC.createGain();
+o.type='sine';o.frequency.value=freq*m;
+g.gain.setValueAtTime(vol*(.15/(i+1)),t);
+g.gain.exponentialRampToValueAtTime(0.001,t+(sustainOn?1.5:.4)/(i+1));
+o.connect(g);g.connect(masterGain);o.start(t);o.stop(t+(sustainOn?1.5:.4));
+});
+}else if(currentMode==='synth'){
+osc=AC.createOscillator();
+gain=AC.createGain();
+const f=AC.createBiquadFilter();
+f.type='lowpass';f.frequency.setValueAtTime(freq*4,t);f.frequency.exponentialRampToValueAtTime(freq,t+.3);f.Q.value=5;
+osc.type='sawtooth';osc.frequency.value=freq;
+gain.gain.setValueAtTime(vol*.7,t);
+gain.gain.exponentialRampToValueAtTime(0.001,t+(sustainOn?1.2:.35));
+osc.connect(f);f.connect(gain);gain.connect(masterGain);
+osc.start(t);osc.stop(t+(sustainOn?1.2:.35));
+}else if(currentMode==='bass'){
+osc=AC.createOscillator();
+gain=AC.createGain();
+osc.type='triangle';osc.frequency.value=freq/2;
+gain.gain.setValueAtTime(vol,t);
+gain.gain.exponentialRampToValueAtTime(0.001,t+(sustainOn?1.5:.5));
+osc.connect(gain);gain.connect(masterGain);
+osc.start(t);osc.stop(t+(sustainOn?1.5:.5));
+}
+
+// Show squeak text
+const sq=SQUEAKS[noteIdx%12];
+const el=document.getElementById('squeakText');
+el.textContent=currentMode==='squeak'?`✨ ${sq}! ✨`:`♪ ${NOTE_NAMES[noteIdx]}${oct}`;
+el.classList.add('show');
+clearTimeout(el._t);
+el._t=setTimeout(()=>el.classList.remove('show'),400);
+
+// Sparkle
+spawnSparkle();
+}
+
+// Build keyboard
+function buildKeyboard(){
+const wk=document.getElementById('whiteKeys');
+const bk=document.getElementById('blackKeys');
+wk.innerHTML='';bk.innerHTML='';
+
+WHITE_INDICES.forEach((ni,i)=>{
+const key=document.createElement('div');
+key.className='white-key';
+key.dataset.note=ni;
+const sq=SQUEAKS[ni];
+key.innerHTML=`<span class="squeak">${sq}</span><span class="label">${WHITE_LABELS[i]}<br><span style="font-size:.85em;opacity:.5">${KEY_MAP_WHITE[i].toUpperCase()}</span></span>`;
+key.addEventListener('pointerdown',e=>{e.preventDefault();pressKey(key,ni)});
+key.addEventListener('pointerup',()=>releaseKey(key));
+key.addEventListener('pointerleave',()=>releaseKey(key));
+wk.appendChild(key);
+});
+
+BLACK_INDICES.forEach((ni,i)=>{
+if(ni===null){
+const spacer=document.createElement('div');
+spacer.className='black-key-spacer';
+bk.appendChild(spacer);
+return;
+}
+const key=document.createElement('div');
+key.className='black-key';
+key.dataset.note=ni;
+key.innerHTML=`<span class="label">${BLACK_LABELS[i]}<br>${KEY_MAP_BLACK[i]?KEY_MAP_BLACK[i].toUpperCase():''}</span>`;
+key.addEventListener('pointerdown',e=>{e.preventDefault();pressKey(key,ni)});
+key.addEventListener('pointerup',()=>releaseKey(key));
+key.addEventListener('pointerleave',()=>releaseKey(key));
+bk.appendChild(key);
+});
+}
+
+function pressKey(el,noteIdx){
+el.classList.add('pressed');
+playNote(noteIdx,currentOctave);
+}
+function releaseKey(el){el.classList.remove('pressed')}
+
+buildKeyboard();
+
+// Keyboard input
+const keyState={};
+document.addEventListener('keydown',e=>{
+if(e.repeat)return;
+const k=e.key.toLowerCase();
+if(k===' '){sustainOn=true;document.getElementById('sustain').checked=true;return}
+if(k==='z'){currentOctave=Math.max(2,currentOctave-1);document.getElementById('octLabel').textContent=currentOctave;return}
+if(k==='x'){currentOctave=Math.min(7,currentOctave+1);document.getElementById('octLabel').textContent=currentOctave;return}
+let wi=KEY_MAP_WHITE.indexOf(k);
+if(wi>=0){
+const ni=WHITE_INDICES[wi];
+const el=document.querySelectorAll('.white-key')[wi];
+if(el&&!keyState[k]){keyState[k]=true;pressKey(el,ni)}
+return;
+}
+let bi=KEY_MAP_BLACK.indexOf(k);
+if(bi>=0&&BLACK_INDICES[bi]!==null){
+const ni=BLACK_INDICES[bi];
+const bkeys=document.querySelectorAll('.black-key');
+// find correct black key element
+let idx=0;
+for(let j=0;j<=bi;j++){if(BLACK_INDICES[j]!==null)idx++}
+idx--;
+const el=bkeys[idx];
+if(el&&!keyState[k]){keyState[k]=true;pressKey(el,ni)}
+}
+});
+document.addEventListener('keyup',e=>{
+const k=e.key.toLowerCase();
+if(k===' '){sustainOn=false;document.getElementById('sustain').checked=false;return}
+keyState[k]=false;
+let wi=KEY_MAP_WHITE.indexOf(k);
+if(wi>=0){const el=document.querySelectorAll('.white-key')[wi];if(el)releaseKey(el);return}
+let bi=KEY_MAP_BLACK.indexOf(k);
+if(bi>=0&&BLACK_INDICES[bi]!==null){
+const bkeys=document.querySelectorAll('.black-key');
+let idx=0;for(let j=0;j<=bi;j++){if(BLACK_INDICES[j]!==null)idx++}idx--;
+const el=bkeys[idx];if(el)releaseKey(el);
+}
+});
+
+// Mode buttons
+document.querySelector('.controls').addEventListener('click',e=>{
+if(e.target.tagName!=='BUTTON'||!e.target.dataset.mode)return;
+document.querySelectorAll('.controls button').forEach(b=>b.classList.remove('active'));
+e.target.classList.add('active');
+currentMode=e.target.dataset.mode;
+});
+
+// Octave buttons
+document.getElementById('octDown').addEventListener('click',()=>{currentOctave=Math.max(2,currentOctave-1);document.getElementById('octLabel').textContent=currentOctave});
+document.getElementById('octUp').addEventListener('click',()=>{currentOctave=Math.min(7,currentOctave+1);document.getElementById('octLabel').textContent=currentOctave});
+document.getElementById('sustain').addEventListener('change',e=>{sustainOn=e.target.checked});
+
+// Visualizer
+const visCanvas=document.getElementById('vis');
+const vctx=visCanvas.getContext('2d');
+const bufLen=analyser.frequencyBinCount;
+const dataArr=new Uint8Array(bufLen);
+function drawVis(){
+requestAnimationFrame(drawVis);
+analyser.getByteFrequencyData(dataArr);
+const w=visCanvas.width,h=visCanvas.height;
+vctx.clearRect(0,0,w,h);
+const barW=w/bufLen*2.5;
+let x=0;
+for(let i=0;i<bufLen;i++){
+const v=dataArr[i]/255;
+const bh=v*h;
+const hue=270+v*40;
+vctx.fillStyle=`hsla(${hue},70%,${50+v*30}%,${0.3+v*0.7})`;
+vctx.fillRect(x,h-bh,barW-1,bh);
+x+=barW;
+if(x>w)break;
+}
+}
+drawVis();
+
+// Sparkles
+const spkCanvas=document.getElementById('sparkles');
+const sctx=spkCanvas.getContext('2d');
+let sparks=[];
+function resizeSpk(){spkCanvas.width=innerWidth;spkCanvas.height=innerHeight}
+resizeSpk();addEventListener('resize',resizeSpk);
+
+function spawnSparkle(){
+const cx=innerWidth/2+((Math.random()-.5)*300);
+const cy=innerHeight/2+((Math.random()-.5)*100);
+for(let i=0;i<8;i++){
+sparks.push({x:cx,y:cy,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4-2,life:1,r:Math.random()*3+1,hue:270+Math.random()*40});
+}
+}
+function drawSparks(){
+requestAnimationFrame(drawSparks);
+sctx.clearRect(0,0,spkCanvas.width,spkCanvas.height);
+sparks=sparks.filter(s=>s.life>0);
+sparks.forEach(s=>{
+s.x+=s.vx;s.y+=s.vy;s.vy+=0.08;s.life-=0.025;
+sctx.beginPath();sctx.arc(s.x,s.y,s.r*s.life,0,Math.PI*2);
+sctx.fillStyle=`hsla(${s.hue},80%,70%,${s.life})`;
+sctx.fill();
+});
+}
+drawSparks();
+
+// Star bg
+const bgc=document.getElementById('bg'),bctx=bgc.getContext('2d');
+let sw,sh,stars=[];
+function resizeBg(){sw=bgc.width=innerWidth;sh=bgc.height=innerHeight;stars=Array.from({length:70},()=>({x:Math.random()*sw,y:Math.random()*sh,r:Math.random()*1.5+.5,s:Math.random()*.3+.1,o:Math.random()*6}))}
+resizeBg();addEventListener('resize',resizeBg);
+function drawBg(){
+bctx.clearRect(0,0,sw,sh);
+stars.forEach(s=>{s.o+=s.s*.02;const a=.3+Math.sin(s.o)*.3;bctx.beginPath();bctx.arc(s.x,s.y,s.r,0,Math.PI*2);bctx.fillStyle=`rgba(168,85,247,${a})`;bctx.fill()});
+requestAnimationFrame(drawBg);
+}
+drawBg();
+</script>
+</body>
+</html>

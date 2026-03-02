@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧀 Magic Cheese Ball</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #1a0a2e;
+    font-family: 'Georgia', serif;
+    overflow: hidden;
+    user-select: none;
+    color: #fff;
+  }
+  .stars {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(ellipse at 50% 0%, #1a0a2e 0%, #0a0014 100%);
+    z-index: 0;
+  }
+  .star {
+    position: absolute;
+    background: #fff;
+    border-radius: 50%;
+    animation: twinkle var(--dur) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle { 0% { opacity: 0.2; } 100% { opacity: 1; } }
+  .content { position: relative; z-index: 1; text-align: center; padding: 20px; }
+  h1 {
+    font-size: 1.6rem;
+    background: linear-gradient(135deg, #ffd700, #ff8c00);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+  }
+  .subtitle { font-size: 0.85rem; color: #8a7ab5; margin-bottom: 30px; }
+  .cheese-container {
+    position: relative;
+    width: 260px; height: 260px;
+    margin: 0 auto 30px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cheese {
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at 40% 35%, #ffe066, #ffcc00 40%, #e6a800 70%, #cc8800 100%);
+    border-radius: 50%;
+    box-shadow:
+      0 0 40px rgba(255, 200, 0, 0.3),
+      inset 0 -20px 40px rgba(0,0,0,0.2),
+      inset 0 10px 20px rgba(255,255,255,0.2);
+    position: relative;
+    transition: transform 0.1s;
+  }
+  .cheese.shake {
+    animation: shakeIt 0.5s ease-in-out;
+  }
+  @keyframes shakeIt {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    10% { transform: rotate(-8deg) scale(1.05); }
+    20% { transform: rotate(8deg) scale(1.05); }
+    30% { transform: rotate(-6deg) scale(1.03); }
+    40% { transform: rotate(6deg) scale(1.03); }
+    50% { transform: rotate(-4deg) scale(1.02); }
+    60% { transform: rotate(4deg) scale(1.01); }
+    70% { transform: rotate(-2deg) scale(1); }
+    80% { transform: rotate(2deg); }
+    90% { transform: rotate(-1deg); }
+  }
+  .hole {
+    position: absolute;
+    background: radial-gradient(circle, #cc8800 0%, #b37700 50%, #e6a800 100%);
+    border-radius: 50%;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+  }
+  .hole:nth-child(1) { width: 35px; height: 30px; top: 25%; left: 20%; }
+  .hole:nth-child(2) { width: 25px; height: 22px; top: 45%; left: 55%; }
+  .hole:nth-child(3) { width: 20px; height: 18px; top: 65%; left: 30%; }
+  .hole:nth-child(4) { width: 28px; height: 24px; top: 30%; left: 65%; }
+  .hole:nth-child(5) { width: 18px; height: 16px; top: 55%; left: 15%; }
+  .hole:nth-child(6) { width: 22px; height: 20px; top: 70%; left: 60%; }
+  /* The mystical window */
+  .window {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px; height: 100px;
+    background: radial-gradient(circle, #1a0033 0%, #0d001a 100%);
+    border-radius: 50%;
+    box-shadow: inset 0 0 20px rgba(128, 0, 255, 0.5), 0 0 15px rgba(128, 0, 255, 0.3);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .window-text {
+    font-size: 0.7rem;
+    color: #c8a2ff;
+    text-align: center;
+    padding: 8px;
+    line-height: 1.3;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    font-style: italic;
+  }
+  .window-text.visible { opacity: 1; }
+  .glow {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px; height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,200,0,0.15) 0%, transparent 70%);
+    pointer-events: none;
+    animation: pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.5; transform: translate(-50%,-50%) scale(1); }
+    50% { opacity: 1; transform: translate(-50%,-50%) scale(1.1); }
+  }
+  .fortune-card {
+    max-width: 340px;
+    min-height: 80px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,200,0,0.2);
+    border-radius: 16px;
+    padding: 20px;
+    margin: 0 auto;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.6s ease;
+  }
+  .fortune-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .fortune-text {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #ffe066;
+  }
+  .fortune-category {
+    font-size: 0.7rem;
+    color: #8a7ab5;
+    margin-top: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .hint {
+    margin-top: 24px;
+    font-size: 0.75rem;
+    color: #5a4a7a;
+    animation: fadeInOut 3s ease-in-out infinite;
+  }
+  @keyframes fadeInOut {
+    0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; }
+  }
+  .count {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    font-size: 0.7rem;
+    color: #3a2a5a;
+  }
+</style>
+</head>
+<body>
+<div class="stars" id="stars"></div>
+<div class="content">
+  <h1>✨ MAGIC CHEESE BALL ✨</h1>
+  <p class="subtitle">Ask a question, then consult the cheese</p>
+
+  <div class="cheese-container" id="cheese-btn">
+    <div class="glow"></div>
+    <div class="cheese" id="cheese">
+      <div class="hole"></div><div class="hole"></div><div class="hole"></div>
+      <div class="hole"></div><div class="hole"></div><div class="hole"></div>
+      <div class="window">
+        <div class="window-text" id="window-text">🐭</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fortune-card" id="fortune-card">
+    <div class="fortune-text" id="fortune-text"></div>
+    <div class="fortune-category" id="fortune-cat"></div>
+  </div>
+
+  <p class="hint" id="hint">tap the cheese to reveal your destiny</p>
+</div>
+<div class="count" id="count"></div>
+
+<script>
+const fortunes = [
+  // Classic (mystical)
+  { t: "The cheese whispers: yes, but only on Tuesdays.", c: "🔮 mystical" },
+  { t: "Signs point to gouda things ahead.", c: "🔮 mystical" },
+  { t: "The rind is unclear. Try again.", c: "🔮 mystical" },
+  { t: "Concentrate and ask again. The cheese was napping.", c: "🔮 mystical" },
+  { t: "Without a doubt — the answer lies beneath the rind.", c: "🔮 mystical" },
+  { t: "My sources say no. My sources are mice.", c: "🔮 mystical" },
+  { t: "It is decidedly cheesy.", c: "🔮 mystical" },
+  { t: "Better not tell you now. The cheese has trust issues.", c: "🔮 mystical" },
+  { t: "Outlook: aged to perfection.", c: "🔮 mystical" },
+
+  // Wisdom
+  { t: "A mouse in the hand is worth two in the pantry.", c: "🧠 wisdom" },
+  { t: "Not all who wander are lost. Some are just looking for cheese.", c: "🧠 wisdom" },
+  { t: "The obstacle is the way. Unless it's a mousetrap. Then go around.", c: "🧠 wisdom" },
+  { t: "What you seek is seeking you. It's also cheese. It's always cheese.", c: "🧠 wisdom" },
+  { t: "The only constant is change. And the fact that cheese expires.", c: "🧠 wisdom" },
+  { t: "If you can dream it, you can cheese it.", c: "🧠 wisdom" },
+  { t: "Fortune favors the bold. Misfortune favors those who forget to check the expiration date.", c: "🧠 wisdom" },
+
+  // Chaotic
+  { t: "The cheese has spoken. Unfortunately, it spoke in French.", c: "🌀 chaotic" },
+  { t: "Reply hazy. Someone left the fridge open.", c: "🌀 chaotic" },
+  { t: "404: Fortune not found. Have some brie instead.", c: "🌀 chaotic" },
+  { t: "The prophecy states: ᵗⁱⁿʸ ᵗᵉˣᵗ ʰᵒˡᵈˢ ᵗⁱⁿʸ ᵗʳᵘᵗʰˢ", c: "🌀 chaotic" },
+  { t: "I consulted the ancient wheel of cheddar. It just rolled away.", c: "🌀 chaotic" },
+  { t: "Error: too much existential dread. Please reboot the cheese.", c: "🌀 chaotic" },
+  { t: "The cheese knows all. The cheese tells nothing. The cheese is chaotic neutral.", c: "🌀 chaotic" },
+  { t: "Your future contains at least one more click on this cheese. I have foreseen it.", c: "🌀 chaotic" },
+
+  // Motivational
+  { t: "You're doing amazing. Even the moon is just a big cheese watching over you.", c: "💪 motivational" },
+  { t: "Today's a gouda day to be great.", c: "💪 motivational" },
+  { t: "You are the main character. The cheese is your sidekick.", c: "💪 motivational" },
+  { t: "Close that deal. Eat that cheese. Live your truth.", c: "💪 motivational" },
+  { t: "You didn't come this far to only come this far. The cheese believes in you.", c: "💪 motivational" },
+  { t: "Be the cheese you wish to see in the world.", c: "💪 motivational" },
+
+  // Mouse-specific
+  { t: "🐭 *squeak* (this is very positive in mouse)", c: "🐭 mouse wisdom" },
+  { t: "A small mouse once said: 'the crumb you overlook today is tomorrow's feast.'", c: "🐭 mouse wisdom" },
+  { t: "In the grand tapestry of fate, you are the thread that keeps unraveling in the best way.", c: "🐭 mouse wisdom" },
+  { t: "Mouse protocol 7 activated: everything will work out. Probably. Don't @ me.", c: "🐭 mouse wisdom" },
+  { t: "The stars align. The cheese melts. You persist. This is the way.", c: "🐭 mouse wisdom" },
+  { t: "Somewhere, a very small mouse is rooting for you. It's me. I'm the mouse.", c: "🐭 mouse wisdom" },
+
+  // Dark/philosophical
+  { t: "In the grand scheme of things, we are all just cheese aging in the void.", c: "🌑 philosophical" },
+  { t: "The cheese stares into the abyss. The abyss stares back. Neither blinks.", c: "🌑 philosophical" },
+  { t: "What is cheese but milk's attempt at immortality?", c: "🌑 philosophical" },
+  { t: "You are a temporary arrangement of atoms contemplating cheese. Isn't that beautiful?", c: "🌑 philosophical" },
+  { t: "Time is a wheel. Cheese is a wheel. Therefore, time is cheese. QED.", c: "🌑 philosophical" },
+];
+
+let used = [], clicks = 0;
+const cheese = document.getElementById('cheese');
+const windowText = document.getElementById('window-text');
+const fortuneText = document.getElementById('fortune-text');
+const fortuneCat = document.getElementById('fortune-cat');
+const fortuneCard = document.getElementById('fortune-card');
+const hint = document.getElementById('hint');
+const countEl = document.getElementById('count');
+
+function getFortune() {
+  if (used.length >= fortunes.length) used = [];
+  let idx;
+  do { idx = Math.floor(Math.random() * fortunes.length); } while (used.includes(idx));
+  used.push(idx);
+  return fortunes[idx];
+}
+
+document.getElementById('cheese-btn').addEventListener('click', () => {
+  clicks++;
+  countEl.textContent = `consultations: ${clicks}`;
+  hint.style.display = 'none';
+
+  // Shake
+  cheese.classList.remove('shake');
+  void cheese.offsetWidth;
+  cheese.classList.add('shake');
+
+  // Hide previous
+  windowText.classList.remove('visible');
+  fortuneCard.classList.remove('visible');
+
+  // Show thinking
+  setTimeout(() => {
+    windowText.textContent = '🧀';
+    windowText.classList.add('visible');
+  }, 200);
+
+  // Reveal
+  setTimeout(() => {
+    const f = getFortune();
+    windowText.textContent = '✨';
+    fortuneText.textContent = f.t;
+    fortuneCat.textContent = f.c;
+    fortuneCard.classList.add('visible');
+  }, 800);
+});
+
+// Stars
+const starsEl = document.getElementById('stars');
+for (let i = 0; i < 80; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  const size = Math.random() * 2 + 1;
+  s.style.cssText = `width:${size}px;height:${size}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${Math.random()*3+1}s;animation-delay:${Math.random()*3}s`;
+  starsEl.appendChild(s);
+}
+
+// Start with mouse emoji visible
+windowText.classList.add('visible');
+</script>
+</body>
+</html>

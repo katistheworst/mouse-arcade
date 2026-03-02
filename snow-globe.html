@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌨️ Farewell Winter Snow Globe</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;overflow:hidden;font-family:'Segoe UI',sans-serif;cursor:grab;user-select:none;display:flex;align-items:center;justify-content:center;height:100vh;width:100vw}
+body:active{cursor:grabbing}
+canvas{position:fixed;top:0;left:0;z-index:0}
+.controls{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:10;opacity:0;transition:opacity .4s}
+body:hover .controls{opacity:1}
+.btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#e0d0ff;padding:8px 16px;border-radius:20px;cursor:pointer;font-size:13px;backdrop-filter:blur(8px);transition:all .2s}
+.btn:hover{background:rgba(255,255,255,.2);transform:scale(1.05)}
+.btn.active{background:rgba(180,160,255,.3);border-color:rgba(180,160,255,.5)}
+.title{position:fixed;top:20px;left:50%;transform:translateX(-50%);color:rgba(180,160,255,.6);font-size:13px;letter-spacing:2px;text-transform:uppercase;z-index:10;opacity:0;transition:opacity .4s;white-space:nowrap}
+body:hover .title{opacity:1}
+.shake-hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.15);font-size:16px;z-index:5;pointer-events:none;transition:opacity 1s;letter-spacing:1px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="title">farewell winter — march 1, 2026</div>
+<div class="shake-hint" id="hint">click & drag to shake ✨</div>
+<div class="controls">
+<button class="btn active" data-scene="0">🏔️ Mountain</button>
+<button class="btn" data-scene="1">🌲 Forest</button>
+<button class="btn" data-scene="2">🐭 Mouse Home</button>
+<button class="btn" data-scene="3">🌸 Spring</button>
+</div>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W,H,cx,cy,globeR,baseY;
+function resize(){W=canvas.width=innerWidth;H=canvas.height=innerHeight;cx=W/2;cy=H/2-20;globeR=Math.min(W,H)*.32;baseY=cy+globeR*.85}
+resize();window.onresize=resize;
+
+// Stars
+const stars=Array.from({length:150},()=>({x:Math.random(),y:Math.random(),s:Math.random()*1.5+.5,t:Math.random()*Math.PI*2,sp:Math.random()*.02+.005}));
+
+// Snow particles
+const MAX_SNOW=400;
+let snow=[];
+function makeSnow(n,burst=false){
+  for(let i=0;i<n;i++){
+    const angle=Math.random()*Math.PI*2,r=Math.random()*globeR*.9;
+    snow.push({
+      x:cx+Math.cos(angle)*r,
+      y:burst?cy-globeR*.5+Math.random()*globeR*.3:cy-globeR+Math.random()*globeR*1.6,
+      vx:(Math.random()-.5)*(burst?3:.3),
+      vy:burst?(Math.random()*2-1):Math.random()*.5+.3,
+      r:Math.random()*2.5+1,
+      o:Math.random()*.6+.4,
+      settled:false,
+      settleY:0
+    });
+  }
+}
+makeSnow(120);
+
+// Shaking
+let shakeX=0,shakeY=0,shakeVX=0,shakeVY=0,isDragging=false,lastMX=0,lastMY=0;
+canvas.addEventListener('mousedown',e=>{isDragging=true;lastMX=e.clientX;lastMY=e.clientY;document.getElementById('hint').style.opacity='0'});
+canvas.addEventListener('mousemove',e=>{if(!isDragging)return;const dx=e.clientX-lastMX,dy=e.clientY-lastMY;shakeVX+=dx*.15;shakeVY+=dy*.15;lastMX=e.clientX;lastMY=e.clientY});
+canvas.addEventListener('mouseup',()=>{isDragging=false;if(Math.abs(shakeVX)+Math.abs(shakeVY)>3)shake()});
+canvas.addEventListener('touchstart',e=>{isDragging=true;lastMX=e.touches[0].clientX;lastMY=e.touches[0].clientY;document.getElementById('hint').style.opacity='0'},{passive:true});
+canvas.addEventListener('touchmove',e=>{if(!isDragging)return;const t=e.touches[0],dx=t.clientX-lastMX,dy=t.clientY-lastMY;shakeVX+=dx*.15;shakeVY+=dy*.15;lastMX=t.clientX;lastMY=t.clientY},{passive:true});
+canvas.addEventListener('touchend',()=>{isDragging=false;if(Math.abs(shakeVX)+Math.abs(shakeVY)>3)shake()});
+
+function shake(){
+  // Unsettle all snow
+  snow.forEach(s=>{s.settled=false;s.vy=-Math.random()*3-1;s.vx=(Math.random()-.5)*4});
+  // Add burst
+  if(snow.length<MAX_SNOW)makeSnow(Math.min(80,MAX_SNOW-snow.length),true);
+}
+
+// Scenes
+let currentScene=0;
+const scenes=[
+  // Mountain
+  function(gx,gy,r){
+    // Ground snow
+    ctx.fillStyle='#e8e0f0';
+    ctx.beginPath();ctx.ellipse(gx,gy+r*.45,r*.85,r*.15,0,0,Math.PI*2);ctx.fill();
+    // Mountain
+    ctx.fillStyle='#6a5a8a';
+    ctx.beginPath();ctx.moveTo(gx-r*.3,gy+r*.4);ctx.lineTo(gx,gy-r*.35);ctx.lineTo(gx+r*.35,gy+r*.4);ctx.fill();
+    // Snow cap
+    ctx.fillStyle='#e8e0f0';
+    ctx.beginPath();ctx.moveTo(gx-r*.08,gy-r*.15);ctx.lineTo(gx,gy-r*.35);ctx.lineTo(gx+r*.1,gy-r*.15);ctx.lineTo(gx+r*.05,gy-r*.12);ctx.lineTo(gx-r*.03,gy-r*.13);ctx.fill();
+    // Small mountain
+    ctx.fillStyle='#574878';
+    ctx.beginPath();ctx.moveTo(gx+r*.1,gy+r*.4);ctx.lineTo(gx+r*.3,gy+r*.05);ctx.lineTo(gx+r*.55,gy+r*.4);ctx.fill();
+    // Tiny cabin
+    ctx.fillStyle='#8b6f47';
+    ctx.fillRect(gx-r*.2,gy+r*.22,r*.12,r*.1);
+    ctx.fillStyle='#c0392b';
+    ctx.beginPath();ctx.moveTo(gx-r*.22,gy+r*.22);ctx.lineTo(gx-r*.14,gy+r*.14);ctx.lineTo(gx-r*.06,gy+r*.22);ctx.fill();
+    // Window glow
+    ctx.fillStyle='#ffeaa7';
+    ctx.fillRect(gx-r*.16,gy+r*.26,r*.03,r*.03);
+  },
+  // Forest
+  function(gx,gy,r){
+    ctx.fillStyle='#e8e0f0';
+    ctx.beginPath();ctx.ellipse(gx,gy+r*.45,r*.85,r*.15,0,0,Math.PI*2);ctx.fill();
+    const trees=[-.35,-.15,0,.2,.38];
+    const heights=[.25,.4,.35,.45,.3];
+    trees.forEach((tx,i)=>{
+      const x=gx+r*tx,h=r*heights[i];
+      ctx.fillStyle='#3d5c3a';
+      ctx.beginPath();ctx.moveTo(x-r*.06,gy+r*.35);ctx.lineTo(x,gy+r*.35-h);ctx.lineTo(x+r*.06,gy+r*.35);ctx.fill();
+      // Snow on tips
+      ctx.fillStyle='#e8e0f0';
+      ctx.beginPath();ctx.moveTo(x-r*.02,gy+r*.35-h+r*.05);ctx.lineTo(x,gy+r*.35-h);ctx.lineTo(x+r*.02,gy+r*.35-h+r*.05);ctx.fill();
+    });
+    // Deer silhouette
+    ctx.fillStyle='#5a4a3a';
+    const dx=gx+r*.05,dy=gy+r*.3;
+    ctx.beginPath();ctx.ellipse(dx,dy,r*.04,r*.025,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(dx+r*.04,dy-r*.02,r*.015,r*.012,-.3,0,Math.PI*2);ctx.fill();
+  },
+  // Mouse Home
+  function(gx,gy,r){
+    ctx.fillStyle='#e8e0f0';
+    ctx.beginPath();ctx.ellipse(gx,gy+r*.45,r*.85,r*.15,0,0,Math.PI*2);ctx.fill();
+    // Cheese wedge
+    ctx.fillStyle='#f1c40f';
+    ctx.beginPath();ctx.moveTo(gx+r*.1,gy+r*.2);ctx.lineTo(gx+r*.25,gy+r*.35);ctx.lineTo(gx+r*.05,gy+r*.35);ctx.fill();
+    ctx.fillStyle='#e8a800';
+    ctx.beginPath();ctx.arc(gx+r*.15,gy+r*.28,r*.02,0,Math.PI*2);ctx.fill();
+    // Mouse body
+    const mx=gx-r*.1,my=gy+r*.28;
+    ctx.fillStyle='#b4a0ff';
+    ctx.beginPath();ctx.ellipse(mx,my,r*.06,r*.04,0,0,Math.PI*2);ctx.fill();
+    // Head
+    ctx.beginPath();ctx.ellipse(mx+r*.06,my-r*.02,r*.03,r*.025,0,0,Math.PI*2);ctx.fill();
+    // Ears
+    ctx.fillStyle='#d4c0ff';
+    ctx.beginPath();ctx.ellipse(mx+r*.07,my-r*.045,r*.015,r*.02,-.3,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(mx+r*.05,my-r*.04,r*.015,r*.02,.3,0,Math.PI*2);ctx.fill();
+    // Eyes
+    ctx.fillStyle='#1a1a2e';
+    ctx.beginPath();ctx.arc(mx+r*.07,my-r*.015,r*.005,0,Math.PI*2);ctx.fill();
+    // Tail
+    ctx.strokeStyle='#b4a0ff';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(mx-r*.06,my);ctx.quadraticCurveTo(mx-r*.1,my-r*.05,mx-r*.12,my-r*.08);ctx.stroke();
+    // Little house
+    ctx.fillStyle='#8b6f47';
+    ctx.fillRect(gx-r*.35,gy+r*.15,r*.15,r*.2);
+    ctx.fillStyle='#6a5040';
+    ctx.beginPath();ctx.moveTo(gx-r*.37,gy+r*.15);ctx.lineTo(gx-r*.275,gy+r*.02);ctx.lineTo(gx-r*.18,gy+r*.15);ctx.fill();
+    // Door
+    ctx.fillStyle='#5a4030';
+    ctx.beginPath();ctx.ellipse(gx-r*.275,gy+r*.35,r*.03,r*.04,0,Math.PI,0);ctx.fill();
+  },
+  // Spring (transition scene)
+  function(gx,gy,r){
+    // Green ground (spring!)
+    ctx.fillStyle='#7ec88a';
+    ctx.beginPath();ctx.ellipse(gx,gy+r*.45,r*.85,r*.15,0,0,Math.PI*2);ctx.fill();
+    // Patches of remaining snow
+    ctx.fillStyle='rgba(232,224,240,.5)';
+    ctx.beginPath();ctx.ellipse(gx-r*.3,gy+r*.4,r*.12,r*.04,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(gx+r*.25,gy+r*.42,r*.08,r*.03,0,0,Math.PI*2);ctx.fill();
+    // Flowers
+    const flowers=[[-.2,.35,'#ff6b9d'],[.1,.33,'#ffd93d'],[.3,.37,'#b4a0ff'],[-.05,.38,'#ff6b9d'],[.2,.35,'#ffd93d']];
+    flowers.forEach(([fx,fy,col])=>{
+      const x=gx+r*fx,y=gy+r*fy;
+      ctx.fillStyle='#4a8c5c';
+      ctx.fillRect(x-1,y,2,r*.06);
+      ctx.fillStyle=col;
+      for(let p=0;p<5;p++){
+        const a=p/5*Math.PI*2;
+        ctx.beginPath();ctx.arc(x+Math.cos(a)*r*.015,y+Math.sin(a)*r*.015,r*.01,0,Math.PI*2);ctx.fill();
+      }
+      ctx.fillStyle='#ffeaa7';
+      ctx.beginPath();ctx.arc(x,y,r*.008,0,Math.PI*2);ctx.fill();
+    });
+    // Butterfly
+    const t=Date.now()/1000;
+    const bx=gx+Math.sin(t*.7)*r*.25,by=gy+r*.1+Math.sin(t*1.3)*r*.05;
+    const wing=Math.sin(t*6)*.3+.4;
+    ctx.fillStyle='rgba(180,160,255,.7)';
+    ctx.save();ctx.translate(bx,by);
+    ctx.beginPath();ctx.ellipse(-r*.02,0,r*.02,r*.015*wing,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(r*.02,0,r*.02,r*.015*wing,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1a1a2e';
+    ctx.fillRect(-1,-r*.01,2,r*.02);
+    ctx.restore();
+    // Sun
+    ctx.fillStyle='rgba(255,217,61,.8)';
+    ctx.beginPath();ctx.arc(gx+r*.3,gy-r*.3,r*.08,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,217,61,.15)';
+    ctx.beginPath();ctx.arc(gx+r*.3,gy-r*.3,r*.15,0,Math.PI*2);ctx.fill();
+    // Text
+    ctx.fillStyle='rgba(90,70,50,.4)';ctx.font=`${r*.06}px 'Segoe UI'`;ctx.textAlign='center';
+    ctx.fillText('hello spring 🌸',gx,gy+r*.55);
+  }
+];
+
+// Scene buttons
+document.querySelectorAll('.btn[data-scene]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    currentScene=+btn.dataset.scene;
+    document.querySelectorAll('.btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// Main loop
+let lastTime=0;
+function draw(time){
+  const dt=Math.min((time-lastTime)/16,3);lastTime=time;
+  ctx.clearRect(0,0,W,H);
+  
+  // BG gradient
+  const bg=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H));
+  bg.addColorStop(0,'#1a1033');bg.addColorStop(1,'#0a0a1a');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  
+  // Stars
+  stars.forEach(s=>{
+    s.t+=s.sp;
+    const a=Math.sin(s.t)*.3+.7;
+    ctx.fillStyle=`rgba(200,180,255,${a})`;
+    ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.s,0,Math.PI*2);ctx.fill();
+  });
+  
+  // Shake physics
+  shakeVX*=.92;shakeVY*=.92;
+  shakeX+=shakeVX*dt;shakeY+=shakeVY*dt;
+  shakeX*=.9;shakeY*=.9;
+  
+  const gx=cx+shakeX,gy=cy+shakeY;
+  
+  // Globe glass
+  ctx.save();
+  ctx.beginPath();ctx.arc(gx,gy,globeR,0,Math.PI*2);
+  ctx.fillStyle='rgba(20,15,40,.4)';ctx.fill();
+  ctx.clip();
+  
+  // Scene
+  scenes[currentScene](gx,gy,globeR);
+  
+  // Snow inside globe
+  snow.forEach(s=>{
+    if(!s.settled){
+      s.vy+=.015*dt; // gravity
+      s.vx*=.99;
+      s.x+=s.vx*dt;
+      s.y+=s.vy*dt;
+      // Settle on ground
+      const groundY=gy+globeR*.38;
+      if(s.y>groundY){s.y=groundY;s.settled=true;s.settleY=groundY}
+      // Keep in globe
+      const dx=s.x-gx,dy=s.y-gy,dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist>globeR*.9){const a=Math.atan2(dy,dx);s.x=gx+Math.cos(a)*globeR*.9;s.y=gy+Math.sin(a)*globeR*.9;s.vx*=-.3;s.vy*=-.3}
+    }
+    ctx.fillStyle=`rgba(255,255,255,${s.o})`;
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+  });
+  
+  // Trim excess
+  if(snow.length>MAX_SNOW)snow.splice(0,snow.length-MAX_SNOW);
+  
+  ctx.restore();
+  
+  // Globe glass highlight
+  ctx.strokeStyle='rgba(180,160,255,.15)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(gx,gy,globeR,0,Math.PI*2);ctx.stroke();
+  
+  // Shine
+  const shine=ctx.createRadialGradient(gx-globeR*.3,gy-globeR*.3,0,gx-globeR*.3,gy-globeR*.3,globeR*.4);
+  shine.addColorStop(0,'rgba(255,255,255,.08)');shine.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=shine;ctx.beginPath();ctx.arc(gx,gy,globeR,0,Math.PI*2);ctx.fill();
+  
+  // Base
+  const baseH=globeR*.2;
+  ctx.fillStyle='#2a1f3d';
+  ctx.beginPath();
+  ctx.moveTo(gx-globeR*.5,gy+globeR*.8);
+  ctx.quadraticCurveTo(gx-globeR*.6,gy+globeR*.8+baseH,gx-globeR*.55,gy+globeR*.8+baseH);
+  ctx.lineTo(gx+globeR*.55,gy+globeR*.8+baseH);
+  ctx.quadraticCurveTo(gx+globeR*.6,gy+globeR*.8+baseH,gx+globeR*.5,gy+globeR*.8);
+  ctx.fill();
+  
+  // Base top
+  ctx.fillStyle='#3a2f5d';
+  ctx.beginPath();ctx.ellipse(gx,gy+globeR*.8,globeR*.5,globeR*.08,0,0,Math.PI*2);ctx.fill();
+  
+  // Base label
+  ctx.fillStyle='rgba(180,160,255,.4)';ctx.font=`${globeR*.06}px 'Segoe UI'`;ctx.textAlign='center';
+  ctx.fillText('farewell, winter',gx,gy+globeR*.95);
+  
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// Hide hint after 5s
+setTimeout(()=>{document.getElementById('hint').style.opacity='0'},5000);
+</script>
+</body>
+</html>

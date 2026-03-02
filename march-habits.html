@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>March Habits 🐭</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a14;color:#e0d0f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+.stars{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.star{position:absolute;background:#fff;border-radius:50%;animation:twinkle var(--d) ease-in-out infinite alternate}
+@keyframes twinkle{0%{opacity:.1}100%{opacity:var(--o)}}
+.container{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:20px}
+h1{text-align:center;font-size:1.8em;margin:20px 0 5px;background:linear-gradient(135deg,#c084fc,#f0abfc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{text-align:center;color:#a78bba;font-size:.9em;margin-bottom:20px}
+.controls{display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
+.controls button,.controls input{background:#1a1a2e;border:1px solid #3a2a5a;border-radius:8px;color:#e0d0f0;padding:8px 16px;font-size:.85em;cursor:pointer}
+.controls input{width:200px}
+.controls button:hover{background:#2a1a4e;border-color:#c084fc}
+.grid{display:grid;grid-template-columns:180px repeat(31,1fr);gap:1px;background:#1a1a2e;border-radius:12px;overflow:hidden;border:1px solid #3a2a5a;margin-bottom:20px}
+.header-cell{background:#1a1a2e;padding:6px 2px;text-align:center;font-size:.7em;color:#a78bba;font-weight:600}
+.header-cell.weekend{color:#f0abfc}
+.habit-name{background:#12121e;padding:8px 10px;font-size:.8em;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.habit-name:hover{background:#1a1a2e}
+.habit-name .emoji{font-size:1.1em}
+.day-cell{background:#12121e;padding:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;min-height:32px}
+.day-cell:hover{background:#2a1a4e}
+.day-cell.checked{background:#7c3aed33}
+.day-cell.checked::after{content:'✦';color:#c084fc;font-size:.8em}
+.day-cell.future{opacity:.3;cursor:default}
+.day-cell.today{box-shadow:inset 0 0 0 2px #c084fc}
+.streak-bar{background:#12121e;padding:6px 8px;display:flex;align-items:center;gap:6px}
+.streak-fill{height:6px;border-radius:3px;background:linear-gradient(90deg,#7c3aed,#c084fc);transition:width .3s}
+.streak-num{font-size:.7em;color:#c084fc;min-width:30px;text-align:right}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:#1a1a2e;border:1px solid #3a2a5a;border-radius:10px;padding:14px;text-align:center}
+.stat-val{font-size:1.6em;font-weight:700;background:linear-gradient(135deg,#c084fc,#f0abfc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-label{font-size:.75em;color:#a78bba;margin-top:4px}
+.delete-btn{opacity:0;margin-left:auto;color:#f06;font-size:.7em;cursor:pointer;padding:2px 6px;border-radius:4px}
+.habit-name:hover .delete-btn{opacity:.6}
+.delete-btn:hover{opacity:1!important;background:#f0064420}
+@media(max-width:700px){.grid{grid-template-columns:120px repeat(31,1fr)}.habit-name{font-size:.7em;padding:6px}.header-cell{font-size:.6em}}
+</style>
+</head>
+<body>
+<div class="stars" id="stars"></div>
+<div class="container">
+<h1>🐭 March Habits</h1>
+<p class="subtitle">click a cell to toggle · streak = consecutive days from today backward</p>
+
+<div class="stats" id="stats"></div>
+
+<div class="controls">
+<input type="text" id="newHabit" placeholder="New habit... (e.g. 💧 Water)">
+<button onclick="addHabit()">+ Add</button>
+<button onclick="exportData()">📋 Copy Data</button>
+</div>
+
+<div class="grid" id="grid"></div>
+</div>
+
+<script>
+const YEAR=2026,MONTH=2,DAYS=31; // March 2026
+const STORAGE_KEY='mouse-march-habits-2026';
+const WEEKDAYS=['S','M','T','W','T','F','S'];
+
+let data=load();
+
+function load(){
+  try{const s=localStorage.getItem(STORAGE_KEY);if(s)return JSON.parse(s)}catch{}
+  return {habits:[
+    {id:'h1',name:'💧 Water (8 cups)',checks:{}},
+    {id:'h2',name:'🏋️ Exercise',checks:{}},
+    {id:'h3',name:'📖 Read 20 min',checks:{}},
+    {id:'h4',name:'🧘 Breathe / Meditate',checks:{}},
+    {id:'h5',name:'📝 Journal',checks:{}}
+  ]};
+}
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}
+
+function today(){
+  const d=new Date();
+  // Check if it's March 2026
+  if(d.getFullYear()===YEAR&&d.getMonth()===MONTH)return d.getDate();
+  return 0; // not March
+}
+
+function render(){
+  const grid=document.getElementById('grid');
+  const t=today();
+  grid.innerHTML='';
+  // Header row
+  grid.innerHTML+='<div class="header-cell"></div>';
+  for(let d=1;d<=DAYS;d++){
+    const dow=new Date(YEAR,MONTH,d).getDay();
+    const isWknd=dow===0||dow===6;
+    grid.innerHTML+=`<div class="header-cell${isWknd?' weekend':''}">${d}<br><span style="font-size:.8em">${WEEKDAYS[dow]}</span></div>`;
+  }
+
+  data.habits.forEach(h=>{
+    grid.innerHTML+=`<div class="habit-name" title="${h.name}"><span class="emoji">${h.name.match(/^\p{Emoji}/u)?'':''}</span>${h.name}<span class="delete-btn" onclick="event.stopPropagation();removeHabit('${h.id}')">✕</span></div>`;
+    for(let d=1;d<=DAYS;d++){
+      const isFuture=t>0&&d>t;
+      const isToday=d===t;
+      const checked=!!h.checks[d];
+      grid.innerHTML+=`<div class="day-cell${checked?' checked':''}${isFuture?' future':''}${isToday?' today':''}" data-h="${h.id}" data-d="${d}" ${isFuture?'':'onclick="toggle(this)"'}></div>`;
+    }
+  });
+
+  renderStats();
+}
+
+function toggle(el){
+  const hid=el.dataset.h,d=parseInt(el.dataset.d);
+  const h=data.habits.find(x=>x.id===hid);
+  if(!h)return;
+  if(h.checks[d])delete h.checks[d];else h.checks[d]=1;
+  save();render();
+}
+
+function addHabit(){
+  const inp=document.getElementById('newHabit');
+  const name=inp.value.trim();
+  if(!name)return;
+  data.habits.push({id:'h'+Date.now(),name,checks:{}});
+  inp.value='';
+  save();render();
+}
+
+function removeHabit(id){
+  if(!confirm('Remove this habit?'))return;
+  data.habits=data.habits.filter(h=>h.id!==id);
+  save();render();
+}
+
+function getStreak(h){
+  const t=today()||DAYS;
+  let s=0;
+  for(let d=t;d>=1;d--){
+    if(h.checks[d])s++;else break;
+  }
+  return s;
+}
+
+function renderStats(){
+  const t=today()||1;
+  const totalPossible=data.habits.length*t;
+  const totalDone=data.habits.reduce((s,h)=>{
+    for(let d=1;d<=t;d++)if(h.checks[d])s++;
+    return s;
+  },0);
+  const pct=totalPossible?Math.round(totalDone/totalPossible*100):0;
+  const bestStreak=Math.max(0,...data.habits.map(h=>getStreak(h)));
+  const todayDone=data.habits.filter(h=>h.checks[t]).length;
+
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="stat-val">${todayDone}/${data.habits.length}</div><div class="stat-label">Today</div></div>
+    <div class="stat"><div class="stat-val">${pct}%</div><div class="stat-label">March Completion</div></div>
+    <div class="stat"><div class="stat-val">${bestStreak}🔥</div><div class="stat-label">Best Streak</div></div>
+    <div class="stat"><div class="stat-val">${totalDone}</div><div class="stat-label">Total Check-ins</div></div>
+  `;
+}
+
+function exportData(){
+  const lines=['March 2026 Habits'];
+  data.habits.forEach(h=>{
+    const days=[];
+    for(let d=1;d<=DAYS;d++)if(h.checks[d])days.push(d);
+    lines.push(`${h.name}: ${days.length}/31 — days: ${days.join(', ')||'none'}`);
+  });
+  navigator.clipboard.writeText(lines.join('\n')).then(()=>alert('Copied!'));
+}
+
+// Stars
+(()=>{const c=document.getElementById('stars');for(let i=0;i<80;i++){const s=document.createElement('div');s.className='star';s.style.cssText=`left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${1+Math.random()*2}px;--d:${2+Math.random()*4}s;--o:${.3+Math.random()*.7}`;c.appendChild(s)}})();
+
+document.getElementById('newHabit').addEventListener('keydown',e=>{if(e.key==='Enter')addHabit()});
+render();
+</script>
+</body>
+</html>

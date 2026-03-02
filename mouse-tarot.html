@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mouse Tarot 🐭🔮</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:#0a0a1a;color:#e0d0f0;font-family:'Georgia',serif;overflow-x:hidden;display:flex;flex-direction:column;align-items:center}
+.starfield{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.star{position:absolute;background:#fff;border-radius:50%;animation:twinkle var(--dur) ease-in-out infinite alternate}
+@keyframes twinkle{0%{opacity:.2;transform:scale(.8)}100%{opacity:1;transform:scale(1.2)}}
+h1{font-size:2rem;margin:20px 0 5px;z-index:1;background:linear-gradient(135deg,#c084fc,#f0abfc,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center}
+.subtitle{font-size:.9rem;color:#a78bfa;margin-bottom:20px;z-index:1;font-style:italic}
+.spread-picker{z-index:1;display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;justify-content:center}
+.spread-btn{background:rgba(139,92,246,.2);border:1px solid #7c3aed;color:#c4b5fd;padding:8px 18px;border-radius:20px;cursor:pointer;font-family:inherit;font-size:.85rem;transition:all .3s}
+.spread-btn:hover,.spread-btn.active{background:#7c3aed;color:#fff}
+.reading-area{z-index:1;display:flex;flex-direction:column;align-items:center;width:100%;max-width:900px;padding:0 15px}
+.cards-container{display:flex;gap:15px;flex-wrap:wrap;justify-content:center;margin-bottom:25px;perspective:800px}
+.card{width:130px;height:210px;cursor:pointer;position:relative;transform-style:preserve-3d;transition:transform .8s cubic-bezier(.4,0,.2,1);border-radius:12px}
+.card.flipped{transform:rotateY(180deg)}
+.card.reversed.flipped{transform:rotateY(180deg) rotate(180deg)}
+.card-face{position:absolute;width:100%;height:100%;backface-visibility:hidden;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;text-align:center}
+.card-back{background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid #6d28d9;overflow:hidden}
+.card-back-pattern{font-size:2.5rem;opacity:.6}
+.card-back-label{font-size:.65rem;color:#a78bfa;margin-top:8px;letter-spacing:2px;text-transform:uppercase}
+.card-front{background:linear-gradient(180deg,#1a1033,#0f0a20);border:2px solid #a855f7;transform:rotateY(180deg);padding:8px;gap:4px}
+.card-front .emoji{font-size:2.2rem}
+.card-front .card-name{font-size:.7rem;font-weight:bold;color:#e9d5ff;line-height:1.2}
+.card-front .card-num{font-size:.55rem;color:#7c3aed;font-variant:small-caps}
+.card-front .reversed-tag{font-size:.5rem;color:#f59e0b;margin-top:2px}
+.card-position{font-size:.6rem;color:#a78bfa;position:absolute;top:-18px;left:50%;transform:translateX(-50%);white-space:nowrap;font-style:italic}
+.interpretation{z-index:1;background:rgba(30,27,75,.7);border:1px solid #4c1d95;border-radius:16px;padding:20px;max-width:700px;width:100%;margin-bottom:30px;backdrop-filter:blur(10px)}
+.interpretation h2{font-size:1.1rem;color:#c084fc;margin-bottom:10px}
+.card-reading{margin-bottom:15px;padding-bottom:15px;border-bottom:1px solid rgba(139,92,246,.2)}
+.card-reading:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.card-reading h3{font-size:.9rem;color:#e9d5ff;margin-bottom:5px}
+.card-reading .meaning{font-size:.8rem;color:#c4b5fd;line-height:1.5}
+.card-reading .position-label{font-size:.7rem;color:#a78bfa;font-style:italic}
+.draw-btn{z-index:1;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none;padding:14px 35px;border-radius:30px;font-size:1rem;font-family:inherit;cursor:pointer;transition:all .3s;margin-bottom:20px;letter-spacing:1px}
+.draw-btn:hover{transform:scale(1.05);box-shadow:0 0 25px rgba(168,85,247,.5)}
+.draw-btn:disabled{opacity:.5;cursor:default;transform:none}
+.hidden{display:none}
+.overall{margin-top:10px;padding-top:15px;border-top:2px solid #7c3aed}
+.overall h3{color:#fbbf24;font-size:.95rem;margin-bottom:5px}
+.overall .meaning{color:#e9d5ff}
+@keyframes dealIn{0%{opacity:0;transform:translateY(-40px) scale(.7) rotateY(0)}100%{opacity:1;transform:translateY(0) scale(1) rotateY(0)}}
+.card.dealt{animation:dealIn .5s ease-out forwards}
+.mouse-footer{z-index:1;font-size:.7rem;color:#6d28d9;margin:10px 0 20px;font-style:italic}
+</style>
+</head>
+<body>
+<div class="starfield" id="stars"></div>
+<h1>🐭 Mouse Tarot 🔮</h1>
+<p class="subtitle">The cards squeak truth, if you listen closely.</p>
+
+<div class="spread-picker">
+  <button class="spread-btn active" data-spread="1">Single Card</button>
+  <button class="spread-btn" data-spread="3">Past / Present / Future</button>
+  <button class="spread-btn" data-spread="5">Mouse Cross</button>
+</div>
+
+<button class="draw-btn" id="drawBtn">Draw the Cards</button>
+
+<div class="reading-area">
+  <div class="cards-container" id="cardsContainer"></div>
+  <div class="interpretation hidden" id="interpretation"></div>
+</div>
+
+<p class="mouse-footer">🧀 fortune favors the cheese-bold 🧀</p>
+
+<script>
+// Major Arcana - Mouse themed
+const MAJOR = [
+  {n:0,name:"The Crumb",emoji:"🍞",up:"A new beginning. Something small leads to something vast. Trust the crumb trail.",down:"Hesitation. You're overthinking the first step. Just nibble."},
+  {n:1,name:"The Whisker",emoji:"🐭",up:"Intuition is sharp. You sense things others miss. Trust the twitch.",down:"Ignoring your instincts. Your whiskers know — why won't you listen?"},
+  {n:2,name:"The Burrow",emoji:"🕳️",up:"Hidden knowledge awaits underground. Dig deeper into what fascinates you.",down:"Hiding from truth. The burrow protects but also isolates."},
+  {n:3,name:"The Cheese Moon",emoji:"🌕",up:"Abundance is coming. The moon is full, the cheese is ripe. Receive it.",down:"Scarcity mindset. There's more cheese than you think."},
+  {n:4,name:"The Owl",emoji:"🦉",up:"A wise authority figure. Structure brings safety. Respect the hierarchy.",down:"Tyranny or rigidity. Not every predator is above you."},
+  {n:5,name:"The Nest",emoji:"🪹",up:"Community, tradition, belonging. Return to what feels like home.",down:"Conformity that stifles. The nest is cozy but the world is wide."},
+  {n:6,name:"The Two Tails",emoji:"💕",up:"Partnership, choice, harmony. Two paths intertwine beautifully.",down:"Misalignment. Are you choosing, or just following?"},
+  {n:7,name:"The Wheel",emoji:"☸️",up:"Momentum! You're in the wheel and running fast. Channel this energy.",down:"The wheel spins but you go nowhere. Step off and reassess."},
+  {n:8,name:"The Cat's Eye",emoji:"🐱",up:"Courage in the face of fear. The cat watches, but you are quick.",down:"Paralysis. The fear is bigger than the cat. Move anyway."},
+  {n:9,name:"The Lantern",emoji:"🏮",up:"Solitude brings wisdom. Light your own way through the dark.",down:"Loneliness mistaken for independence. Seek your colony."},
+  {n:10,name:"The Trap",emoji:"🪤",up:"Fate turns. What seems like a trap may be a gift. Perspective shifts everything.",down:"Bad luck isn't destiny. The wheel turns again."},
+  {n:11,name:"The Scales of Cheddar",emoji:"⚖️",up:"Balance and fairness. Weigh your choices like precious cheese.",down:"Injustice or imbalance. Something isn't being measured right."},
+  {n:12,name:"The Dangling Tail",emoji:"🔄",up:"Surrender. Hang upside down and see the world differently.",down:"Stalling. You're not contemplating — you're procrastinating."},
+  {n:13,name:"The Molt",emoji:"🦋",up:"Transformation. The old fur falls away. You're becoming something new.",down:"Resisting change. You can't keep the old coat forever."},
+  {n:14,name:"The Mixing Bowl",emoji:"🥣",up:"Temperance. Blend the ingredients of your life with patience.",down:"Excess or impatience. Too much of any ingredient spoils the dish."},
+  {n:15,name:"The Glue Trap",emoji:"⛓️",up:"You've bound yourself to something. Is it by choice or by habit?",down:"Breaking free. The adhesion was never permanent."},
+  {n:16,name:"The Mousetrap",emoji:"💥",up:"Sudden upheaval. The snap is jarring but the cheese was never free.",down:"Disaster averted, barely. Learn the lesson."},
+  {n:17,name:"The Starcrumb",emoji:"⭐",up:"Hope and inspiration. The crumbs lead to something magical.",down:"Disconnection from wonder. Look up."},
+  {n:18,name:"The Night Garden",emoji:"🌙",up:"Mystery, dreams, the subconscious. Not everything is as it seems.",down:"Confusion and deception. Trust but verify."},
+  {n:19,name:"The Sunflower Seed",emoji:"🌻",up:"Joy, vitality, success! Bask in the warmth you've earned.",down:"Dimmed light. The seed is there — you just need to find it."},
+  {n:20,name:"The Awakening",emoji:"🔔",up:"A calling. Something inside you is ringing. Answer it.",down:"Self-doubt silencing the bell. It's still ringing."},
+  {n:21,name:"The Infinite Maze",emoji:"♾️",up:"Completion and wholeness. You've run every corridor and found the center.",down:"Unfinished journeys. The maze continues — and that's okay."},
+];
+
+// Minor Arcana - 4 suits
+const SUITS = [
+  {suit:"Crumbs",emoji:"🍞",element:"Earth",domain:"material world, work, body"},
+  {suit:"Whiskers",emoji:"〰️",element:"Air",domain:"thoughts, communication, truth"},
+  {suit:"Drops",emoji:"💧",element:"Water",domain:"emotions, relationships, intuition"},
+  {suit:"Sparks",emoji:"✨",element:"Fire",domain:"passion, creativity, ambition"},
+];
+
+const RANKS = [
+  {rank:"Ace",up:"New beginning in {d}.",down:"Blocked potential in {d}."},
+  {rank:"Two",up:"Balance and partnership in {d}.",down:"Indecision or disconnect in {d}."},
+  {rank:"Three",up:"Growth and collaboration in {d}.",down:"Stagnation in {d}. Seek fresh eyes."},
+  {rank:"Four",up:"Stability and foundation in {d}.",down:"Rigidity in {d}. Flexibility is strength."},
+  {rank:"Five",up:"Challenge and conflict in {d}. Growth through struggle.",down:"Avoidance of necessary conflict in {d}."},
+  {rank:"Six",up:"Harmony and generosity in {d}.",down:"Imbalance or taking too much in {d}."},
+  {rank:"Seven",up:"Reflection and assessment in {d}.",down:"Impatience in {d}. Let things develop."},
+  {rank:"Eight",up:"Movement and mastery in {d}.",down:"Stuckness in {d}. What's blocking you?"},
+  {rank:"Nine",up:"Near completion in {d}. Almost there.",down:"Burnout or overextension in {d}."},
+  {rank:"Ten",up:"Fulfillment and completion in {d}.",down:"Burden or excess in {d}. Let something go."},
+  {rank:"Page",up:"A message or student energy in {d}. Be curious.",down:"Naivety in {d}. Learn before leaping."},
+  {rank:"Knight",up:"Action and pursuit in {d}. Charge forward!",down:"Recklessness in {d}. Speed ≠ wisdom."},
+  {rank:"Queen",up:"Nurturing mastery of {d}. Lead with empathy.",down:"Neglecting {d}. Turn inward."},
+  {rank:"King",up:"Authority and command of {d}. You've earned this.",down:"Domination or disconnection from {d}."},
+];
+
+// Build full deck
+const deck = [];
+MAJOR.forEach(c => deck.push({type:'major',name:c.name,emoji:c.emoji,num:`Major ${c.n}`,up:c.up,down:c.down}));
+SUITS.forEach(s => {
+  RANKS.forEach(r => {
+    deck.push({
+      type:'minor',
+      name:`${r.rank} of ${s.suit}`,
+      emoji:s.emoji,
+      num:`${s.element} · ${s.suit}`,
+      up:r.up.replace('{d}',s.domain),
+      down:r.down.replace('{d}',s.domain)
+    });
+  });
+});
+
+const POSITIONS = {
+  1: ['Your Card'],
+  3: ['Past','Present','Future'],
+  5: ['Heart of the Matter','Challenge','Foundation','Near Future','Guidance']
+};
+
+const OVERALL_MESSAGES = [
+  "The mice have spoken. Take what resonates, leave what doesn't. 🐭",
+  "Every reading is a mirror, not a prophecy. You already know. 🧀",
+  "The cheese of destiny smells strong today. Trust the nose. 🔮",
+  "Remember: even a mouse in a maze eventually finds the exit. ✨",
+  "The cards whisper. Your heart shouts. Listen to both. 💜",
+  "Squeaking into the void — and the void squeaked back. 🌙",
+  "Not all who wander are lost. Some are just looking for cheese. 🗺️",
+  "The universe is a giant wheel. Keep running, little mouse. ☸️",
+];
+
+let currentSpread = 1;
+let drawn = [];
+
+// Stars
+const sf = document.getElementById('stars');
+for(let i=0;i<60;i++){
+  const s=document.createElement('div');s.className='star';
+  s.style.cssText=`left:${Math.random()*100}%;top:${Math.random()*100}%;width:${1+Math.random()*2}px;height:${s.style.width};--dur:${1+Math.random()*3}s;animation-delay:${Math.random()*3}s`;
+  sf.appendChild(s);
+}
+
+// Spread picker
+document.querySelectorAll('.spread-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.spread-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSpread = parseInt(btn.dataset.spread);
+    reset();
+  });
+});
+
+function reset(){
+  drawn=[];
+  document.getElementById('cardsContainer').innerHTML='';
+  document.getElementById('interpretation').classList.add('hidden');
+  document.getElementById('drawBtn').disabled=false;
+  document.getElementById('drawBtn').textContent='Draw the Cards';
+}
+
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+document.getElementById('drawBtn').addEventListener('click', () => {
+  reset();
+  const btn=document.getElementById('drawBtn');
+  btn.disabled=true;
+  btn.textContent='The cards are speaking...';
+  
+  const shuffled = shuffle(deck);
+  const positions = POSITIONS[currentSpread];
+  drawn = [];
+  
+  for(let i=0;i<currentSpread;i++){
+    const card = {...shuffled[i]};
+    card.reversed = Math.random() < 0.35;
+    card.position = positions[i];
+    drawn.push(card);
+  }
+  
+  const container = document.getElementById('cardsContainer');
+  
+  drawn.forEach((card, i) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'card dealt';
+      if(card.reversed) el.classList.add('reversed');
+      el.style.animationDelay = '0s';
+      el.innerHTML = `
+        <div class="card-position">${card.position}</div>
+        <div class="card-face card-back">
+          <div class="card-back-pattern">🐭</div>
+          <div class="card-back-label">Mouse Tarot</div>
+        </div>
+        <div class="card-face card-front">
+          <span class="card-num">${card.num}</span>
+          <span class="emoji">${card.emoji}</span>
+          <span class="card-name">${card.name}</span>
+          ${card.reversed ? '<span class="reversed-tag">⟲ Reversed</span>' : ''}
+        </div>
+      `;
+      el.addEventListener('click', () => el.classList.toggle('flipped'));
+      container.appendChild(el);
+      
+      // Auto-flip after a delay
+      setTimeout(() => el.classList.add('flipped'), 600 + i * 300);
+    }, i * 400);
+  });
+  
+  // Show interpretation
+  setTimeout(() => {
+    const interp = document.getElementById('interpretation');
+    interp.classList.remove('hidden');
+    let html = '<h2>🔮 Your Reading</h2>';
+    drawn.forEach(card => {
+      html += `<div class="card-reading">
+        <p class="position-label">${card.position}</p>
+        <h3>${card.emoji} ${card.name} ${card.reversed ? '(Reversed)' : ''}</h3>
+        <p class="meaning">${card.reversed ? card.down : card.up}</p>
+      </div>`;
+    });
+    html += `<div class="overall"><h3>🐭 Mouse Says...</h3><p class="meaning">${OVERALL_MESSAGES[Math.floor(Math.random()*OVERALL_MESSAGES.length)]}</p></div>`;
+    interp.innerHTML = html;
+    btn.textContent = 'Draw Again';
+    btn.disabled = false;
+  }, currentSpread * 400 + 1200);
+});
+</script>
+</body>
+</html>
