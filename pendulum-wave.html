@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pendulum Wave 🐭</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a1a;
+  overflow: hidden;
+  font-family: 'Segoe UI', sans-serif;
+  color: #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+}
+canvas { display: block; }
+.controls {
+  position: fixed;
+  bottom: 20px;
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 0 20px;
+}
+.btn {
+  background: rgba(138, 92, 246, 0.2);
+  border: 1px solid rgba(138, 92, 246, 0.4);
+  color: #c4b5fd;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+.btn:hover { background: rgba(138, 92, 246, 0.4); }
+.btn.active { background: rgba(138, 92, 246, 0.5); border-color: #a78bfa; }
+.title {
+  position: fixed;
+  top: 16px;
+  font-size: 14px;
+  color: rgba(138, 92, 246, 0.6);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  z-index: 10;
+}
+.info {
+  position: fixed;
+  top: 40px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  z-index: 10;
+}
+</style>
+</head>
+<body>
+<div class="title">pendulum wave</div>
+<div class="info">click anywhere to nudge · drag to push</div>
+<canvas id="c"></canvas>
+<div class="controls">
+  <button class="btn" onclick="resetAll()">↻ Reset</button>
+  <button class="btn" onclick="togglePause()">⏸ Pause</button>
+  <button class="btn" onclick="cycleMode()">🎨 Mode</button>
+  <button class="btn" onclick="cycleCount()">⊕ Count</button>
+  <button class="btn" onclick="toggleTrails()">✨ Trails</button>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, anchorY, baseLen;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  anchorY = H * 0.08;
+  baseLen = H * 0.25;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Config
+let numPendulums = 24;
+let paused = false;
+let showTrails = true;
+let colorMode = 0; // 0=rainbow, 1=purple, 2=fire, 3=ocean
+const colorModes = ['Rainbow', 'Purple', 'Fire', 'Ocean'];
+const countOptions = [12, 24, 36, 48];
+let countIdx = 1;
+
+// Physics: each pendulum completes a different number of oscillations in ~60s
+// Pendulum i completes (baseCycles + i) full swings in cyclePeriod seconds
+const cyclePeriod = 60;
+const baseCycles = 24;
+
+let pendulums = [];
+let time = 0;
+let trails = []; // array of arrays of recent positions
+
+function initPendulums() {
+  pendulums = [];
+  trails = [];
+  time = 0;
+  const spacing = (W * 0.7) / (numPendulums - 1);
+  const startX = W * 0.15;
+  for (let i = 0; i < numPendulums; i++) {
+    const cycles = baseCycles + i;
+    const freq = (2 * Math.PI * cycles) / cyclePeriod;
+    pendulums.push({
+      x: startX + i * spacing,
+      freq: freq,
+      phase: 0,
+      amplitude: Math.PI / 4,
+      damping: 0, // no damping for pure wave
+    });
+    trails.push([]);
+  }
+}
+
+function getColor(i, t) {
+  const n = numPendulums;
+  const hueBase = (i / n) * 360;
+  switch (colorMode) {
+    case 0: // rainbow
+      return `hsl(${(hueBase + t * 20) % 360}, 80%, 65%)`;
+    case 1: // purple
+      return `hsl(${260 + (i / n) * 40}, 70%, ${50 + (i / n) * 25}%)`;
+    case 2: // fire
+      return `hsl(${(i / n) * 50}, 90%, ${45 + (i / n) * 30}%)`;
+    case 3: // ocean
+      return `hsl(${190 + (i / n) * 50}, 70%, ${40 + (i / n) * 30}%)`;
+  }
+}
+
+function draw() {
+  // Semi-transparent clear for trail effect
+  if (showTrails) {
+    ctx.fillStyle = 'rgba(10, 10, 26, 0.08)';
+  } else {
+    ctx.fillStyle = '#0a0a1a';
+  }
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw beam
+  ctx.strokeStyle = 'rgba(138, 92, 246, 0.3)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.1, anchorY);
+  ctx.lineTo(W * 0.9, anchorY);
+  ctx.stroke();
+
+  // Draw each pendulum
+  for (let i = 0; i < numPendulums; i++) {
+    const p = pendulums[i];
+    const angle = p.amplitude * Math.sin(p.freq * time + p.phase);
+
+    // Calculate length: vary slightly for visual interest
+    const len = baseLen + i * (H * 0.35 / numPendulums);
+
+    // Bob position
+    const bobX = p.x + Math.sin(angle) * len;
+    const bobY = anchorY + Math.cos(angle) * len;
+
+    const color = getColor(i, time);
+
+    // String
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x, anchorY);
+    ctx.lineTo(bobX, bobY);
+    ctx.stroke();
+
+    // Bob glow
+    const grad = ctx.createRadialGradient(bobX, bobY, 0, bobX, bobY, 14);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(bobX, bobY, 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bob solid
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(bobX, bobY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Store trail
+    if (showTrails) {
+      trails[i].push({ x: bobX, y: bobY });
+      if (trails[i].length > 40) trails[i].shift();
+    }
+  }
+
+  // Draw trail dots
+  if (showTrails) {
+    for (let i = 0; i < numPendulums; i++) {
+      const color = getColor(i, time);
+      for (let j = 0; j < trails[i].length; j++) {
+        const alpha = j / trails[i].length * 0.4;
+        ctx.fillStyle = color.replace('65%)', `65%, ${alpha})`).replace('hsl(', 'hsla(');
+        ctx.beginPath();
+        ctx.arc(trails[i][j].x, trails[i][j].y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // Time display
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.font = '11px monospace';
+  ctx.fillText(`t = ${time.toFixed(1)}s  |  ${colorModes[colorMode]}  |  ${numPendulums} pendulums`, 12, H - 10);
+}
+
+// Mouse interaction
+let mouseDown = false;
+canvas.addEventListener('mousedown', (e) => {
+  mouseDown = true;
+  nudge(e.clientX, e.clientY, 0.3);
+});
+canvas.addEventListener('mousemove', (e) => {
+  if (mouseDown) nudge(e.clientX, e.clientY, 0.05);
+});
+canvas.addEventListener('mouseup', () => mouseDown = false);
+canvas.addEventListener('touchstart', (e) => {
+  nudge(e.touches[0].clientX, e.touches[0].clientY, 0.3);
+});
+
+function nudge(mx, my, strength) {
+  for (let i = 0; i < numPendulums; i++) {
+    const dx = mx - pendulums[i].x;
+    const dist = Math.abs(dx);
+    if (dist < 200) {
+      const force = (1 - dist / 200) * strength;
+      pendulums[i].phase += (dx > 0 ? 1 : -1) * force;
+    }
+  }
+}
+
+function resetAll() {
+  initPendulums();
+  trails = pendulums.map(() => []);
+}
+
+function togglePause() {
+  paused = !paused;
+  document.querySelectorAll('.btn')[1].textContent = paused ? '▶ Play' : '⏸ Pause';
+}
+
+function cycleMode() {
+  colorMode = (colorMode + 1) % colorModes.length;
+}
+
+function cycleCount() {
+  countIdx = (countIdx + 1) % countOptions.length;
+  numPendulums = countOptions[countIdx];
+  initPendulums();
+}
+
+function toggleTrails() {
+  showTrails = !showTrails;
+  trails = pendulums.map(() => []);
+  document.querySelectorAll('.btn')[4].classList.toggle('active', showTrails);
+}
+
+// Init
+initPendulums();
+document.querySelectorAll('.btn')[4].classList.add('active');
+
+let lastTime = performance.now();
+function loop(now) {
+  if (!paused) {
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    time += dt;
+  }
+  lastTime = now;
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

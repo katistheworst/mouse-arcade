@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌟 Kommander's Milestones</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d0b1a;color:#e8e0f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+.app{position:relative;z-index:1;max-width:600px;margin:0 auto;padding:20px 16px 100px}
+h1{text-align:center;font-size:1.8em;background:linear-gradient(135deg,#f0c0ff,#ffd700,#ff9ecd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.subtitle{text-align:center;color:#a090c0;font-size:.85em;margin-bottom:24px}
+.stats-bar{display:flex;gap:12px;justify-content:center;margin-bottom:24px;flex-wrap:wrap}
+.stat{background:rgba(255,255,255,.06);border-radius:12px;padding:10px 16px;text-align:center;min-width:80px}
+.stat .num{font-size:1.4em;font-weight:700;color:#ffd700}.stat .lbl{font-size:.7em;color:#a090c0;margin-top:2px}
+.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:8px 16px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);cursor:pointer;font-size:.85em;color:#c0b0d8;transition:.2s}
+.tab.active{background:linear-gradient(135deg,#8b5cf6,#d946ef);color:#fff;border-color:transparent}
+.tab:hover:not(.active){background:rgba(255,255,255,.1)}
+.section{display:none}.section.active{display:block}
+/* First Words */
+.word-grid{display:grid;gap:12px}
+.word-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;position:relative;animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.word-card .the-word{font-size:1.6em;font-weight:700;color:#ffd700;margin-bottom:4px}
+.word-card .word-date{font-size:.75em;color:#a090c0}.word-card .word-context{font-size:.85em;color:#c8bfe0;margin-top:6px;font-style:italic}
+.word-card .word-num{position:absolute;top:12px;right:16px;font-size:.7em;color:#8070a0;font-weight:600}
+.word-card .del-btn{position:absolute;bottom:12px;right:16px;background:none;border:none;color:#604060;cursor:pointer;font-size:.8em}
+.word-card .del-btn:hover{color:#ff6b6b}
+/* Milestones */
+.milestone-grid{display:grid;gap:10px}
+.ms-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.2s}
+.ms-card:hover{background:rgba(255,255,255,.08)}
+.ms-card.done{border-color:rgba(255,215,0,.3)}
+.ms-icon{font-size:1.4em;width:36px;text-align:center;flex-shrink:0}
+.ms-info{flex:1}.ms-name{font-size:.95em;font-weight:600}.ms-date{font-size:.7em;color:#a090c0;margin-top:2px}
+.ms-check{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s;font-size:.9em}
+.ms-card.done .ms-check{border-color:#ffd700;background:rgba(255,215,0,.15);color:#ffd700}
+.ms-card.done .ms-name{color:#ffd700}
+/* Timeline */
+.timeline{position:relative;padding-left:30px}
+.timeline::before{content:'';position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#8b5cf6,#d946ef,#ffd700)}
+.tl-item{position:relative;margin-bottom:20px;animation:fadeIn .4s ease}
+.tl-dot{position:absolute;left:-24px;top:4px;width:14px;height:14px;border-radius:50%;background:#8b5cf6;border:2px solid #0d0b1a}
+.tl-item.word .tl-dot{background:#ffd700}
+.tl-item.milestone .tl-dot{background:#d946ef}
+.tl-date{font-size:.7em;color:#8070a0;margin-bottom:2px}.tl-text{font-size:.9em}.tl-type{font-size:.65em;color:#a090c0;margin-top:2px}
+/* Add Form */
+.add-section{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:20px;margin-bottom:20px}
+.add-section h3{font-size:1em;margin-bottom:12px;color:#d0c0f0}
+.form-row{margin-bottom:12px}
+.form-row label{display:block;font-size:.75em;color:#a090c0;margin-bottom:4px}
+.form-row input,.form-row textarea,.form-row select{width:100%;padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:#e8e0f0;font-size:.9em;font-family:inherit}
+.form-row textarea{height:60px;resize:vertical}
+.form-row input:focus,.form-row textarea:focus{outline:none;border-color:#8b5cf6}
+.btn{padding:10px 20px;border-radius:12px;border:none;cursor:pointer;font-size:.9em;font-weight:600;transition:.2s}
+.btn-primary{background:linear-gradient(135deg,#8b5cf6,#d946ef);color:#fff}
+.btn-primary:hover{transform:scale(1.03);filter:brightness(1.1)}
+.btn-secondary{background:rgba(255,255,255,.08);color:#c0b0d8}
+.btn-secondary:hover{background:rgba(255,255,255,.12)}
+.empty{text-align:center;color:#604060;padding:40px 20px;font-size:.9em}
+.age-banner{text-align:center;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.15);border-radius:14px;padding:14px;margin-bottom:20px}
+.age-banner .age{font-size:1.3em;font-weight:700;color:#ffd700}.age-banner .born{font-size:.75em;color:#a090c0;margin-top:4px}
+/* Categories for milestones */
+.cat-filters{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.cat-btn{padding:5px 12px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);cursor:pointer;font-size:.75em;color:#a090c0;transition:.2s}
+.cat-btn.active{background:rgba(139,92,246,.2);color:#c4b5fd;border-color:rgba(139,92,246,.3)}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div class="app">
+<h1>🌟 Kommander's Milestones</h1>
+<p class="subtitle">Every first is magic ✨</p>
+
+<div class="age-banner" id="ageBanner"></div>
+
+<div class="stats-bar" id="statsBar"></div>
+
+<div class="tabs">
+<div class="tab active" data-tab="words">💬 First Words</div>
+<div class="tab" data-tab="milestones">⭐ Milestones</div>
+<div class="tab" data-tab="timeline">📖 Timeline</div>
+</div>
+
+<!-- FIRST WORDS -->
+<div class="section active" id="words">
+<div class="add-section">
+<h3>✨ Log a New Word</h3>
+<div class="form-row"><label>The Word</label><input id="newWord" placeholder="mama, dada, buh..."></div>
+<div class="form-row"><label>Date</label><input type="date" id="wordDate"></div>
+<div class="form-row"><label>Context (optional)</label><textarea id="wordContext" placeholder="What was happening? Who was there?"></textarea></div>
+<button class="btn btn-primary" onclick="addWord()">Add Word 🎉</button>
+</div>
+<div class="word-grid" id="wordGrid"></div>
+</div>
+
+<!-- MILESTONES -->
+<div class="section" id="milestones">
+<div class="cat-filters" id="catFilters"></div>
+<div class="milestone-grid" id="msGrid"></div>
+</div>
+
+<!-- TIMELINE -->
+<div class="section" id="timeline">
+<div class="timeline" id="timelineView"></div>
+</div>
+</div>
+
+<script>
+// Stars
+const c=document.getElementById('bg'),ctx=c.getContext('2d');
+function resize(){c.width=innerWidth;c.height=innerHeight}
+resize();addEventListener('resize',resize);
+const stars=Array.from({length:200},()=>({x:Math.random()*2000,y:Math.random()*2000,r:Math.random()*1.5+.3,s:Math.random()*2+1}));
+function drawStars(){ctx.clearRect(0,0,c.width,c.height);const t=Date.now()/1000;stars.forEach(s=>{const a=.3+.7*(.5+.5*Math.sin(t*s.s));ctx.beginPath();ctx.arc(s.x%c.width,s.y%c.height,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(200,180,255,${a})`;ctx.fill()});requestAnimationFrame(drawStars)}
+drawStars();
+
+// Data
+const BIRTHDAY = new Date('2025-02-01'); // approximate — Kommander ~1 year old
+const DEFAULT_MILESTONES = [
+  {id:'first-smile',cat:'social',icon:'😊',name:'First Social Smile',date:null,note:''},
+  {id:'rolled-over',cat:'motor',icon:'🔄',name:'Rolled Over',date:null,note:''},
+  {id:'sat-up',cat:'motor',icon:'🪑',name:'Sat Up Unassisted',date:null,note:''},
+  {id:'first-laugh',cat:'social',icon:'😂',name:'First Laugh',date:null,note:''},
+  {id:'first-tooth',cat:'body',icon:'🦷',name:'First Tooth',date:null,note:''},
+  {id:'crawling',cat:'motor',icon:'🐛',name:'Started Crawling',date:null,note:''},
+  {id:'pulling-up',cat:'motor',icon:'💪',name:'Pulling Up to Stand',date:null,note:''},
+  {id:'cruising',cat:'motor',icon:'🚶',name:'Cruising (Walking w/ Support)',date:null,note:''},
+  {id:'first-steps',cat:'motor',icon:'👣',name:'First Independent Steps',date:null,note:''},
+  {id:'first-word',cat:'language',icon:'💬',name:'First Word',date:null,note:''},
+  {id:'waving',cat:'social',icon:'👋',name:'Waving Bye-Bye',date:null,note:''},
+  {id:'pointing',cat:'language',icon:'👉',name:'Pointing at Things',date:null,note:''},
+  {id:'clapping',cat:'social',icon:'👏',name:'Clapping Hands',date:null,note:''},
+  {id:'peek-a-boo',cat:'social',icon:'🙈',name:'Plays Peek-a-Boo',date:null,note:''},
+  {id:'self-feeding',cat:'motor',icon:'🥄',name:'Self-Feeding (Finger Foods)',date:null,note:''},
+  {id:'drinking-cup',cat:'motor',icon:'🥤',name:'Drinking from Cup',date:null,note:''},
+  {id:'first-haircut',cat:'body',icon:'✂️',name:'First Haircut',date:null,note:''},
+  {id:'sleeping-through',cat:'body',icon:'😴',name:'Sleeping Through the Night',date:null,note:''},
+  {id:'stranger-anxiety',cat:'social',icon:'😰',name:'Stranger Anxiety Phase',date:null,note:''},
+  {id:'dancing',cat:'motor',icon:'💃',name:'Dancing to Music',date:null,note:''},
+  {id:'stacking',cat:'motor',icon:'🧱',name:'Stacking Blocks',date:null,note:''},
+  {id:'first-birthday',cat:'special',icon:'🎂',name:'First Birthday!',date:null,note:''},
+  {id:'walking-confident',cat:'motor',icon:'🏃',name:'Walking Confidently',date:null,note:''},
+  {id:'running',cat:'motor',icon:'⚡',name:'First Running Steps',date:null,note:''},
+  {id:'two-word-combo',cat:'language',icon:'🗣️',name:'First Two-Word Combo',date:null,note:''},
+];
+
+const CATEGORIES = {motor:'🏃 Motor',language:'💬 Language',social:'💛 Social',body:'🌱 Body',special:'⭐ Special'};
+
+let data = JSON.parse(localStorage.getItem('kommander-data')||'null') || {words:[],milestones:DEFAULT_MILESTONES};
+
+function save(){localStorage.setItem('kommander-data',JSON.stringify(data))}
+
+// Age
+function updateAge(){
+  const now=new Date();const diff=now-BIRTHDAY;
+  const months=Math.floor(diff/(1000*60*60*24*30.44));
+  const days=Math.floor((diff%(1000*60*60*24*30.44))/(1000*60*60*24));
+  document.getElementById('ageBanner').innerHTML=`<div class="age">${months} months, ${days} days old</div><div class="born">Growing every single day 🌱</div>`;
+}
+updateAge();
+
+// Stats
+function updateStats(){
+  const wc=data.words.length;
+  const mc=data.milestones.filter(m=>m.date).length;
+  const total=data.milestones.length;
+  document.getElementById('statsBar').innerHTML=`
+    <div class="stat"><div class="num">${wc}</div><div class="lbl">Words</div></div>
+    <div class="stat"><div class="num">${mc}/${total}</div><div class="lbl">Milestones</div></div>
+    <div class="stat"><div class="num">${wc+mc}</div><div class="lbl">Total Firsts</div></div>`;
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(t.dataset.tab).classList.add('active');
+  }
+});
+
+// Words
+document.getElementById('wordDate').value=new Date().toISOString().split('T')[0];
+function addWord(){
+  const w=document.getElementById('newWord').value.trim();
+  if(!w)return;
+  data.words.push({word:w,date:document.getElementById('wordDate').value,context:document.getElementById('wordContext').value.trim(),id:Date.now()});
+  save();renderWords();updateStats();renderTimeline();
+  document.getElementById('newWord').value='';document.getElementById('wordContext').value='';
+  // sparkle!
+  confettiBurst();
+}
+function deleteWord(id){
+  data.words=data.words.filter(w=>w.id!==id);save();renderWords();updateStats();renderTimeline();
+}
+function renderWords(){
+  const g=document.getElementById('wordGrid');
+  if(!data.words.length){g.innerHTML='<div class="empty">No words yet — every sound is a start 💛</div>';return}
+  const sorted=[...data.words].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  g.innerHTML=sorted.map((w,i)=>`<div class="word-card">
+    <div class="word-num">#${i+1}</div>
+    <div class="the-word">"${w.word}"</div>
+    <div class="word-date">${formatDate(w.date)}</div>
+    ${w.context?`<div class="word-context">"${w.context}"</div>`:''}
+    <button class="del-btn" onclick="deleteWord(${w.id})">remove</button>
+  </div>`).join('');
+}
+
+// Milestones
+let activeCat='all';
+function renderCatFilters(){
+  const f=document.getElementById('catFilters');
+  f.innerHTML=`<div class="cat-btn ${activeCat==='all'?'active':''}" onclick="filterCat('all')">All</div>`+
+    Object.entries(CATEGORIES).map(([k,v])=>`<div class="cat-btn ${activeCat===k?'active':''}" onclick="filterCat('${k}')">${v}</div>`).join('');
+}
+function filterCat(c){activeCat=c;renderCatFilters();renderMilestones()}
+function renderMilestones(){
+  const g=document.getElementById('msGrid');
+  const filtered=activeCat==='all'?data.milestones:data.milestones.filter(m=>m.cat===activeCat);
+  g.innerHTML=filtered.map((m,i)=>`<div class="ms-card ${m.date?'done':''}" onclick="toggleMilestone('${m.id}')">
+    <div class="ms-icon">${m.icon}</div>
+    <div class="ms-info"><div class="ms-name">${m.name}</div>${m.date?`<div class="ms-date">${formatDate(m.date)}</div>`:''}</div>
+    <div class="ms-check">${m.date?'✓':''}</div>
+  </div>`).join('');
+}
+function toggleMilestone(id){
+  const m=data.milestones.find(x=>x.id===id);
+  if(!m)return;
+  if(m.date){
+    if(confirm('Remove this milestone date?')){m.date=null}
+  } else {
+    const d=prompt('When did this happen? (YYYY-MM-DD or leave blank for today)','');
+    m.date=d||new Date().toISOString().split('T')[0];
+    confettiBurst();
+  }
+  save();renderMilestones();updateStats();renderTimeline();
+}
+
+// Timeline
+function renderTimeline(){
+  const tl=document.getElementById('timelineView');
+  const items=[];
+  data.words.forEach(w=>items.push({date:w.date,type:'word',text:`Said "${w.word}"`,detail:w.context}));
+  data.milestones.filter(m=>m.date).forEach(m=>items.push({date:m.date,type:'milestone',text:`${m.icon} ${m.name}`}));
+  items.sort((a,b)=>new Date(a.date)-new Date(b.date));
+  if(!items.length){tl.innerHTML='<div class="empty">Log words and milestones to build the timeline 📖</div>';return}
+  tl.innerHTML=items.map(i=>`<div class="tl-item ${i.type}">
+    <div class="tl-dot"></div>
+    <div class="tl-date">${formatDate(i.date)}</div>
+    <div class="tl-text">${i.text}</div>
+    ${i.detail?`<div class="tl-type">${i.detail}</div>`:''}
+  </div>`).join('');
+}
+
+function formatDate(d){
+  if(!d)return '';
+  const dt=new Date(d+'T12:00:00');
+  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+// Confetti
+function confettiBurst(){
+  const colors=['#ffd700','#ff9ecd','#8b5cf6','#d946ef','#fff'];
+  for(let i=0;i<30;i++){
+    const p=document.createElement('div');
+    p.style.cssText=`position:fixed;width:8px;height:8px;border-radius:50%;background:${colors[i%colors.length]};z-index:999;pointer-events:none;left:50%;top:40%;`;
+    document.body.appendChild(p);
+    const angle=Math.random()*Math.PI*2;const speed=100+Math.random()*200;
+    const dx=Math.cos(angle)*speed;const dy=Math.sin(angle)*speed-100;
+    p.animate([{transform:'translate(0,0) scale(1)',opacity:1},{transform:`translate(${dx}px,${dy+200}px) scale(0)`,opacity:0}],{duration:800+Math.random()*400,easing:'ease-out'});
+    setTimeout(()=>p.remove(),1200);
+  }
+}
+
+// Init
+renderWords();renderCatFilters();renderMilestones();renderTimeline();updateStats();
+</script>
+</body>
+</html>

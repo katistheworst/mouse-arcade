@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consult Notepad 📋</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a1a;color:#e0e0e0;min-height:100vh;overflow-x:hidden}
+canvas{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+.app{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:16px 16px 100px}
+h1{text-align:center;font-size:1.4em;margin:12px 0 4px;background:linear-gradient(135deg,#b48aff,#ff6b9d);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{text-align:center;font-size:.8em;color:#888;margin-bottom:16px}
+.tabs{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px}
+.tab{padding:8px 14px;border-radius:20px;background:#1a1a2e;border:1px solid #333;cursor:pointer;font-size:.85em;white-space:nowrap;transition:.2s}
+.tab.active{background:linear-gradient(135deg,#6a3093,#a044ff);border-color:#a044ff;color:#fff}
+.tab .count{background:rgba(255,255,255,.15);padding:1px 6px;border-radius:10px;margin-left:4px;font-size:.8em}
+.form{background:#12122a;border:1px solid #2a2a4a;border-radius:16px;padding:16px;margin-bottom:12px}
+.form h2{font-size:1em;margin-bottom:12px;color:#b48aff}
+.row{margin-bottom:10px}
+.row label{display:block;font-size:.75em;color:#888;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px}
+.row input,.row textarea,.row select{width:100%;padding:10px 12px;background:#1a1a2e;border:1px solid #333;border-radius:10px;color:#e0e0e0;font-size:.95em;font-family:inherit;outline:none;transition:.2s}
+.row input:focus,.row textarea:focus,.row select:focus{border-color:#a044ff;box-shadow:0 0 0 2px rgba(160,68,255,.2)}
+.row textarea{resize:vertical;min-height:60px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:6px 12px;border-radius:16px;background:#1a1a2e;border:1px solid #333;cursor:pointer;font-size:.8em;transition:.2s;user-select:none}
+.chip.on{background:linear-gradient(135deg,#6a3093,#a044ff);border-color:#a044ff;color:#fff}
+.actions{display:flex;gap:8px;margin-top:14px}
+.btn{flex:1;padding:12px;border:none;border-radius:12px;font-size:.9em;font-weight:600;cursor:pointer;transition:.2s}
+.btn-primary{background:linear-gradient(135deg,#6a3093,#a044ff);color:#fff}
+.btn-primary:active{transform:scale(.97)}
+.btn-secondary{background:#1a1a2e;color:#b48aff;border:1px solid #333}
+.btn-danger{background:#2a1a1a;color:#ff6b6b;border:1px solid #441a1a}
+.btn-sm{padding:6px 10px;font-size:.75em;border-radius:8px;flex:none}
+.card{background:#12122a;border:1px solid #2a2a4a;border-radius:14px;padding:14px;margin-bottom:10px;transition:.2s}
+.card:active{transform:scale(.99)}
+.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.card-name{font-weight:600;font-size:1em}
+.card-amount{color:#ffd700;font-weight:600;font-size:.95em}
+.card-meta{font-size:.75em;color:#888;margin-bottom:6px}
+.card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.card-tag{font-size:.7em;padding:2px 8px;border-radius:8px;background:#2a2a4a;color:#b48aff}
+.card-notes{font-size:.8em;color:#aaa;line-height:1.4}
+.card-actions{display:flex;gap:6px;margin-top:8px;justify-content:flex-end}
+.objection-chips .chip{font-size:.72em;padding:4px 8px}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.status-hot{background:#ff6b6b}.status-warm{background:#ffa94d}.status-cool{background:#74c0fc}.status-booked{background:#69db7c}.status-closed{background:#ffd700}.status-lost{background:#666}
+.empty{text-align:center;padding:40px 20px;color:#555;font-size:.9em}
+.stats{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.stat{flex:1;min-width:70px;background:#12122a;border:1px solid #2a2a4a;border-radius:12px;padding:10px;text-align:center}
+.stat-val{font-size:1.3em;font-weight:700;color:#b48aff}
+.stat-label{font-size:.65em;color:#888;text-transform:uppercase;margin-top:2px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#6a3093;color:#fff;padding:10px 20px;border-radius:20px;font-size:.85em;opacity:0;transition:.3s;z-index:99;pointer-events:none}
+.toast.show{opacity:1}
+.export-box{background:#0a0a1a;border:1px solid #333;border-radius:10px;padding:12px;font-size:.8em;font-family:'Courier New',monospace;white-space:pre-wrap;max-height:300px;overflow-y:auto;color:#ccc;margin-top:10px;line-height:1.5}
+.hidden{display:none}
+@media(max-width:400px){.app{padding:10px 10px 80px}.stats{gap:4px}}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="app">
+<h1>📋 Consult Notepad</h1>
+<p class="sub">Quick-capture consults • Copy for CRM • Never lose a lead</p>
+
+<div class="stats" id="stats"></div>
+
+<div class="tabs" id="tabs">
+<div class="tab active" data-tab="new">✏️ New</div>
+<div class="tab" data-tab="today">Today <span class="count" id="todayCount">0</span></div>
+<div class="tab" data-tab="all">All <span class="count" id="allCount">0</span></div>
+<div class="tab" data-tab="export">📤 Export</div>
+</div>
+
+<div id="tab-new">
+<div class="form">
+<h2>✏️ Quick Capture</h2>
+<div class="row"><label>Client Name</label><input id="f-name" placeholder="First Last"></div>
+<div class="row"><label>Phone</label><input id="f-phone" type="tel" placeholder="(555) 555-5555"></div>
+<div class="row"><label>Treatment Interest</label>
+<div class="chips" id="tx-chips">
+<div class="chip" data-v="LHR">LHR</div>
+<div class="chip" data-v="Botox">Botox</div>
+<div class="chip" data-v="Filler">Filler</div>
+<div class="chip" data-v="CoolSculpting">CoolSculpting</div>
+<div class="chip" data-v="Clear+Brilliant">Clear+Brilliant</div>
+<div class="chip" data-v="Tattoo Removal">Tattoo</div>
+<div class="chip" data-v="IPL">IPL</div>
+<div class="chip" data-v="Microneedling">Microneedling</div>
+</div></div>
+<div class="row"><label>Areas / Details</label><input id="f-areas" placeholder="Full legs, underarms, Brazilian..."></div>
+<div class="row"><label>Quoted $</label><input id="f-quoted" type="number" placeholder="0"></div>
+<div class="row"><label>Status</label>
+<select id="f-status">
+<option value="hot">🔴 Hot — Ready to close</option>
+<option value="warm" selected>🟠 Warm — Interested, needs follow-up</option>
+<option value="cool">🔵 Cool — Shopping around</option>
+<option value="booked">🟢 Booked — Appointment set</option>
+<option value="closed">⭐ Closed — SOLD!</option>
+<option value="lost">⚫ Lost — Not moving forward</option>
+</select></div>
+<div class="row"><label>Objections Heard</label>
+<div class="chips objection-chips" id="obj-chips">
+<div class="chip" data-v="Price">💰 Price</div>
+<div class="chip" data-v="Think about it">🤔 Think about it</div>
+<div class="chip" data-v="Partner">👫 Partner</div>
+<div class="chip" data-v="Timing">⏰ Timing</div>
+<div class="chip" data-v="Pain">😰 Pain</div>
+<div class="chip" data-v="Reviews">📱 Reviews</div>
+<div class="chip" data-v="Competitor">⚔️ Competitor</div>
+<div class="chip" data-v="Results">🤷 Results doubt</div>
+</div></div>
+<div class="row"><label>Notes</label><textarea id="f-notes" placeholder="Key details, follow-up plan, vibe..."></textarea></div>
+<div class="row"><label>Follow-up Date</label><input id="f-followup" type="date"></div>
+<div class="actions">
+<button class="btn btn-primary" onclick="saveConsult()">💾 Save Consult</button>
+<button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+</div>
+</div>
+</div>
+
+<div id="tab-today" class="hidden"></div>
+<div id="tab-all" class="hidden"></div>
+<div id="tab-export" class="hidden">
+<div class="form">
+<h2>📤 Export Today's Consults</h2>
+<p style="font-size:.8em;color:#888;margin-bottom:10px">Copy-paste ready for CRM, manager email, or notes.</p>
+<div class="actions" style="margin-bottom:10px">
+<button class="btn btn-primary" onclick="exportToday()">📋 Generate Today's Summary</button>
+<button class="btn btn-secondary" onclick="exportAll()">📦 Export All</button>
+</div>
+<div id="export-output"></div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+</div>
+
+<script>
+const LS_KEY='mouse-consults';
+let consults=JSON.parse(localStorage.getItem(LS_KEY)||'[]');
+let editing=null;
+
+// Stars
+const c=document.getElementById('stars'),ctx=c.getContext('2d');
+function resizeCanvas(){c.width=innerWidth;c.height=innerHeight}
+resizeCanvas();addEventListener('resize',resizeCanvas);
+const stars=Array.from({length:150},()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:Math.random()*1.5+.3,a:Math.random(),s:Math.random()*.008+.002}));
+function drawStars(){ctx.clearRect(0,0,c.width,c.height);stars.forEach(s=>{s.a+=s.s;ctx.globalAlpha=.3+Math.sin(s.a)*.3;ctx.fillStyle='#b48aff';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()});requestAnimationFrame(drawStars)}
+drawStars();
+
+// Tabs
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+t.classList.add('active');
+['new','today','all','export'].forEach(id=>document.getElementById('tab-'+id).classList.add('hidden'));
+document.getElementById('tab-'+t.dataset.tab).classList.remove('hidden');
+if(t.dataset.tab==='today')renderToday();
+if(t.dataset.tab==='all')renderAll();
+});
+
+// Chips
+document.querySelectorAll('.chips').forEach(g=>g.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>ch.classList.toggle('on')));
+
+function getChips(id){return[...document.querySelectorAll('#'+id+' .chip.on')].map(c=>c.dataset.v)}
+function setChips(id,vals){document.querySelectorAll('#'+id+' .chip').forEach(c=>c.classList.toggle('on',vals.includes(c.dataset.v)))}
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
+
+function today(){return new Date().toISOString().split('T')[0]}
+
+function saveConsult(){
+const name=document.getElementById('f-name').value.trim();
+if(!name){toast('Need a name!');return}
+const obj={
+id:editing||Date.now(),
+name,
+phone:document.getElementById('f-phone').value.trim(),
+treatments:getChips('tx-chips'),
+areas:document.getElementById('f-areas').value.trim(),
+quoted:parseFloat(document.getElementById('f-quoted').value)||0,
+status:document.getElementById('f-status').value,
+objections:getChips('obj-chips'),
+notes:document.getElementById('f-notes').value.trim(),
+followup:document.getElementById('f-followup').value,
+date:editing?consults.find(c=>c.id===editing)?.date||today():today(),
+updated:new Date().toISOString()
+};
+if(editing){const i=consults.findIndex(c=>c.id===editing);if(i>=0)consults[i]=obj}
+else consults.unshift(obj);
+save();clearForm();toast(editing?'Updated!':'Saved! 🧀');editing=null;updateCounts()
+}
+
+function clearForm(){
+['f-name','f-phone','f-areas','f-quoted','f-notes','f-followup'].forEach(id=>document.getElementById(id).value='');
+document.getElementById('f-status').value='warm';
+document.querySelectorAll('.chips .chip').forEach(c=>c.classList.remove('on'));
+editing=null;
+}
+
+function save(){localStorage.setItem(LS_KEY,JSON.stringify(consults))}
+
+function updateCounts(){
+const t=consults.filter(c=>c.date===today()).length;
+const a=consults.length;
+document.getElementById('todayCount').textContent=t;
+document.getElementById('allCount').textContent=a;
+const todayConsults=consults.filter(c=>c.date===today());
+const closed=todayConsults.filter(c=>c.status==='closed');
+const pipeline=todayConsults.filter(c=>['hot','warm','booked'].includes(c.status));
+const rev=closed.reduce((s,c)=>s+c.quoted,0);
+document.getElementById('stats').innerHTML=`
+<div class="stat"><div class="stat-val">${t}</div><div class="stat-label">Today</div></div>
+<div class="stat"><div class="stat-val">${closed.length}</div><div class="stat-label">Closed</div></div>
+<div class="stat"><div class="stat-val">$${rev.toLocaleString()}</div><div class="stat-label">Revenue</div></div>
+<div class="stat"><div class="stat-val">${pipeline.length}</div><div class="stat-label">Pipeline</div></div>`;
+}
+
+function renderCard(c){
+const statusLabels={hot:'Hot',warm:'Warm',cool:'Cool',booked:'Booked',closed:'Closed',lost:'Lost'};
+return`<div class="card" id="card-${c.id}">
+<div class="card-head"><span class="card-name"><span class="status-dot status-${c.status}"></span>${c.name}</span>
+${c.quoted?`<span class="card-amount">$${c.quoted.toLocaleString()}</span>`:''}</div>
+<div class="card-meta">${statusLabels[c.status]}${c.phone?' • '+c.phone:''}${c.followup?' • F/U: '+c.followup:''}</div>
+${c.treatments.length?`<div class="card-tags">${c.treatments.map(t=>`<span class="card-tag">${t}</span>`).join('')}</div>`:''}
+${c.objections.length?`<div class="card-tags">${c.objections.map(o=>`<span class="card-tag" style="background:#2a1a2a;color:#ff6b9d">⚡${o}</span>`).join('')}</div>`:''}
+${c.notes?`<div class="card-notes">${c.notes}</div>`:''}
+<div class="card-actions">
+<button class="btn btn-secondary btn-sm" onclick="copyConsult('${c.id}')">📋 Copy</button>
+<button class="btn btn-secondary btn-sm" onclick="editConsult('${c.id}')">✏️ Edit</button>
+<button class="btn btn-danger btn-sm" onclick="deleteConsult('${c.id}')">🗑️</button>
+</div></div>`}
+
+function renderToday(){
+const t=consults.filter(c=>c.date===today());
+document.getElementById('tab-today').innerHTML=t.length?t.map(renderCard).join(''):'<div class="empty">No consults yet today.<br>Go get \'em! 🧀</div>'
+}
+
+function renderAll(){
+const grouped={};consults.forEach(c=>{(grouped[c.date]=grouped[c.date]||[]).push(c)});
+let html='';
+Object.keys(grouped).sort().reverse().forEach(d=>{
+html+=`<div style="font-size:.75em;color:#888;margin:14px 0 6px;text-transform:uppercase">${new Date(d+'T12:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>`;
+html+=grouped[d].map(renderCard).join('')});
+document.getElementById('tab-all').innerHTML=html||'<div class="empty">No consults saved yet.</div>'
+}
+
+function editConsult(id){
+const c=consults.find(x=>x.id==id);if(!c)return;
+editing=c.id;
+document.getElementById('f-name').value=c.name;
+document.getElementById('f-phone').value=c.phone;
+document.getElementById('f-areas').value=c.areas;
+document.getElementById('f-quoted').value=c.quoted||'';
+document.getElementById('f-status').value=c.status;
+document.getElementById('f-notes').value=c.notes;
+document.getElementById('f-followup').value=c.followup||'';
+setChips('tx-chips',c.treatments);
+setChips('obj-chips',c.objections);
+document.querySelector('[data-tab="new"]').click();
+toast('Editing '+c.name)
+}
+
+function deleteConsult(id){
+consults=consults.filter(c=>c.id!=id);save();updateCounts();
+const el=document.getElementById('card-'+id);if(el)el.remove();toast('Deleted')
+}
+
+function copyConsult(id){
+const c=consults.find(x=>x.id==id);if(!c)return;
+const txt=`${c.name}${c.phone?' | '+c.phone:''}
+${c.treatments.join(', ')}${c.areas?' — '+c.areas:''}
+${c.quoted?'Quoted: $'+c.quoted.toLocaleString():''}
+Status: ${c.status}${c.objections.length?'\nObjections: '+c.objections.join(', '):''}${c.notes?'\nNotes: '+c.notes:''}${c.followup?'\nFollow-up: '+c.followup:''}`.trim();
+navigator.clipboard.writeText(txt).then(()=>toast('Copied! 📋'))
+}
+
+function formatConsultLine(c){
+return`• ${c.name}${c.phone?' ('+c.phone+')':''}${c.treatments.length?' — '+c.treatments.join(', '):''}${c.quoted?' — $'+c.quoted.toLocaleString():''}${c.status==='closed'?' ⭐ CLOSED':''}${c.objections.length?' ['+c.objections.join(', ')+']':''}${c.notes?' | '+c.notes:''}`
+}
+
+function exportToday(){
+const t=consults.filter(c=>c.date===today());
+if(!t.length){document.getElementById('export-output').innerHTML='<div class="empty">No consults today.</div>';return}
+const closed=t.filter(c=>c.status==='closed');
+const pipeline=t.filter(c=>['hot','warm','booked'].includes(c.status));
+const rev=closed.reduce((s,c)=>s+c.quoted,0);
+let txt=`📋 CONSULT LOG — ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}\n\nTotal Consults: ${t.length} | Closed: ${closed.length} | Revenue: $${rev.toLocaleString()} | Pipeline: ${pipeline.length}\n\n`;
+if(closed.length){txt+=`✅ CLOSED:\n${closed.map(formatConsultLine).join('\n')}\n\n`}
+if(pipeline.length){txt+=`🔥 PIPELINE:\n${pipeline.map(formatConsultLine).join('\n')}\n\n`}
+const rest=t.filter(c=>!['closed','hot','warm','booked'].includes(c.status));
+if(rest.length){txt+=`📝 OTHER:\n${rest.map(formatConsultLine).join('\n')}\n`}
+document.getElementById('export-output').innerHTML=`<div class="export-box">${txt}</div><div class="actions" style="margin-top:8px"><button class="btn btn-primary" onclick="navigator.clipboard.writeText(document.querySelector('.export-box').textContent).then(()=>toast('Copied!'))">📋 Copy All</button></div>`
+}
+
+function exportAll(){
+if(!consults.length){document.getElementById('export-output').innerHTML='<div class="empty">Nothing to export.</div>';return}
+const grouped={};consults.forEach(c=>{(grouped[c.date]=grouped[c.date]||[]).push(c)});
+let txt='📋 ALL CONSULTS\n\n';
+Object.keys(grouped).sort().reverse().forEach(d=>{
+txt+=`--- ${new Date(d+'T12:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} ---\n`;
+txt+=grouped[d].map(formatConsultLine).join('\n')+'\n\n'});
+document.getElementById('export-output').innerHTML=`<div class="export-box">${txt}</div><div class="actions" style="margin-top:8px"><button class="btn btn-primary" onclick="navigator.clipboard.writeText(document.querySelector('.export-box').textContent).then(()=>toast('Copied!'))">📋 Copy All</button></div>`
+}
+
+updateCounts();
+</script>
+</body>
+</html>
