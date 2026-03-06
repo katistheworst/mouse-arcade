@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Fluid Sim 🌊</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a14;overflow:hidden;font-family:'Segoe UI',sans-serif;cursor:crosshair;touch-action:none}
+canvas{display:block}
+#ui{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:10;opacity:0;transition:opacity .3s}
+body:hover #ui,#ui:hover{opacity:1}
+button{background:rgba(120,80,200,.3);border:1px solid rgba(180,160,255,.3);color:#c8b8ff;padding:8px 16px;border-radius:20px;cursor:pointer;font-size:13px;backdrop-filter:blur(8px);transition:all .2s}
+button:hover{background:rgba(120,80,200,.6);transform:scale(1.05)}
+button.active{background:rgba(180,100,255,.5);border-color:#b4a0ff}
+#palette{display:flex;gap:6px;align-items:center}
+.swatch{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .2s}
+.swatch.active{border-color:#fff;transform:scale(1.15)}
+#hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(180,160,255,.4);font-size:16px;pointer-events:none;transition:opacity 1s}
+#title{position:fixed;top:16px;left:50%;transform:translateX(-50%);color:rgba(180,160,255,.25);font-size:13px;letter-spacing:2px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="title">FLUID SIM 🌊</div>
+<div id="hint">click & drag to pour</div>
+<div id="ui">
+  <div id="palette"></div>
+  <button id="btnGravity">⬇ Gravity</button>
+  <button id="btnClear">Clear</button>
+</div>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W,H,N,cellSize=4,gridW,gridH;
+// Fluid grid: velocity (u,v), density per color channel (r,g,b), pressure
+let u,v,u0,v0,dr,dg,db,dr0,dg0,db0;
+const dt=0.15,diff=0.00001,visc=0.00005,iter=4;
+let gravity=true,pointerDown=false,px=0,py=0,opx=0,opy=0;
+let colorIdx=0;
+const colors=[
+  {name:'Purple',r:180,g:100,b:255,hex:'#b464ff'},
+  {name:'Cyan',r:50,g:220,b:255,hex:'#32dcff'},
+  {name:'Pink',r:255,g:100,b:180,hex:'#ff64b4'},
+  {name:'Gold',r:255,g:200,b:50,hex:'#ffc832'},
+  {name:'Green',r:80,g:255,b:140,hex:'#50ff8c'},
+  {name:'Red',r:255,g:80,b:60,hex:'#ff503c'},
+];
+
+function resize(){
+  W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;
+  gridW=Math.floor(W/cellSize);gridH=Math.floor(H/cellSize);N=(gridW+2)*(gridH+2);
+  u=new Float32Array(N);v=new Float32Array(N);
+  u0=new Float32Array(N);v0=new Float32Array(N);
+  dr=new Float32Array(N);dg=new Float32Array(N);db=new Float32Array(N);
+  dr0=new Float32Array(N);dg0=new Float32Array(N);db0=new Float32Array(N);
+}
+resize();window.addEventListener('resize',resize);
+
+function IX(x,y){return x+(gridW+2)*y}
+
+function setBnd(b,x){
+  const w=gridW,h=gridH;
+  for(let i=1;i<=h;i++){
+    x[IX(0,i)]=b===1?-x[IX(1,i)]:x[IX(1,i)];
+    x[IX(w+1,i)]=b===1?-x[IX(w,i)]:x[IX(w,i)];
+  }
+  for(let i=1;i<=w;i++){
+    x[IX(i,0)]=b===2?-x[IX(i,1)]:x[IX(i,1)];
+    x[IX(i,h+1)]=b===2?-x[IX(i,h)]:x[IX(i,h)];
+  }
+  x[IX(0,0)]=0.5*(x[IX(1,0)]+x[IX(0,1)]);
+  x[IX(0,h+1)]=0.5*(x[IX(1,h+1)]+x[IX(0,h)]);
+  x[IX(w+1,0)]=0.5*(x[IX(w,0)]+x[IX(w+1,1)]);
+  x[IX(w+1,h+1)]=0.5*(x[IX(w,h+1)]+x[IX(w+1,h)]);
+}
+
+function linSolve(b,x,x0,a,c){
+  const cR=1/c;
+  for(let k=0;k<iter;k++){
+    for(let j=1;j<=gridH;j++)for(let i=1;i<=gridW;i++){
+      x[IX(i,j)]=(x0[IX(i,j)]+a*(x[IX(i-1,j)]+x[IX(i+1,j)]+x[IX(i,j-1)]+x[IX(i,j+1)]))*cR;
+    }
+    setBnd(b,x);
+  }
+}
+
+function diffuse(b,x,x0,d){
+  const a=dt*d*gridW*gridH;
+  linSolve(b,x,x0,a,1+4*a);
+}
+
+function advect(b,d,d0,uu,vv){
+  const dt0x=dt*gridW,dt0y=dt*gridH,w=gridW,h=gridH;
+  for(let j=1;j<=h;j++)for(let i=1;i<=w;i++){
+    let x=i-dt0x*uu[IX(i,j)],y=j-dt0y*vv[IX(i,j)];
+    if(x<0.5)x=0.5;if(x>w+0.5)x=w+0.5;
+    const i0=Math.floor(x),i1=i0+1,s1=x-i0,s0=1-s1;
+    if(y<0.5)y=0.5;if(y>h+0.5)y=h+0.5;
+    const j0=Math.floor(y),j1=j0+1,t1=y-j0,t0=1-t1;
+    d[IX(i,j)]=s0*(t0*d0[IX(i0,j0)]+t1*d0[IX(i0,j1)])+s1*(t0*d0[IX(i1,j0)]+t1*d0[IX(i1,j1)]);
+  }
+  setBnd(b,d);
+}
+
+function project(){
+  const w=gridW,h=gridH,hx=1/w,hy=1/h;
+  for(let j=1;j<=h;j++)for(let i=1;i<=w;i++){
+    v0[IX(i,j)]=-0.5*(hx*(u[IX(i+1,j)]-u[IX(i-1,j)])+hy*(v[IX(i,j+1)]-v[IX(i,j-1)]));
+    u0[IX(i,j)]=0;
+  }
+  setBnd(0,v0);setBnd(0,u0);
+  linSolve(0,u0,v0,1,4);
+  for(let j=1;j<=h;j++)for(let i=1;i<=w;i++){
+    u[IX(i,j)]-=0.5*w*(u0[IX(i+1,j)]-u0[IX(i-1,j)]);
+    v[IX(i,j)]-=0.5*h*(u0[IX(i,j+1)]-u0[IX(i,j-1)]);
+  }
+  setBnd(1,u);setBnd(2,v);
+}
+
+function velStep(){
+  // add gravity
+  if(gravity)for(let i=0;i<N;i++)v[i]+=0.001;
+  
+  u0.set(u);v0.set(v);
+  diffuse(1,u,u0,visc);diffuse(2,v,v0,visc);
+  project();
+  u0.set(u);v0.set(v);
+  advect(1,u,u0,u0,v0);advect(2,v,v0,u0,v0);
+  project();
+}
+
+function densStep(d,d0){
+  d0.set(d);diffuse(0,d,d0,diff);
+  d0.set(d);advect(0,d,d0,u,v);
+}
+
+function addSource(gx,gy,vx,vy,col){
+  const r=5;
+  for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){
+    const dist=dx*dx+dy*dy;
+    if(dist>r*r)continue;
+    const i=gx+dx,j=gy+dy;
+    if(i<1||i>gridW||j<1||j>gridH)continue;
+    const idx=IX(i,j),f=(1-dist/(r*r))*0.8;
+    u[idx]+=vx*f;v[idx]+=vy*f;
+    dr[idx]+=col.r/255*f*2;
+    dg[idx]+=col.g/255*f*2;
+    db[idx]+=col.b/255*f*2;
+  }
+}
+
+// Stars
+const stars=[];for(let i=0;i<150;i++)stars.push({x:Math.random(),y:Math.random(),s:Math.random()*1.5+0.5,p:Math.random()*Math.PI*2,sp:0.01+Math.random()*0.02});
+
+let imageData;
+function render(){
+  // Draw stars on black
+  ctx.fillStyle='#0a0a14';ctx.fillRect(0,0,W,H);
+  const t=performance.now()*0.001;
+  for(const s of stars){
+    const a=0.2+0.3*Math.sin(t*s.sp*10+s.p);
+    ctx.fillStyle=`rgba(180,160,255,${a})`;
+    ctx.fillRect(s.x*W,s.y*H,s.s,s.s);
+  }
+  
+  // Fluid
+  if(!imageData||imageData.width!==gridW||imageData.height!==gridH)
+    imageData=ctx.createImageData(gridW,gridH);
+  const d=imageData.data;
+  for(let j=1;j<=gridH;j++)for(let i=1;i<=gridW;i++){
+    const idx=IX(i,j);
+    const pi=((j-1)*gridW+(i-1))*4;
+    const r=Math.min(255,dr[idx]*255)|0;
+    const g=Math.min(255,dg[idx]*255)|0;
+    const b=Math.min(255,db[idx]*255)|0;
+    const a=Math.min(255,(dr[idx]+dg[idx]+db[idx])*200)|0;
+    d[pi]=r;d[pi+1]=g;d[pi+2]=b;d[pi+3]=a;
+  }
+  // Scale up
+  const tmp=document.createElement('canvas');
+  tmp.width=gridW;tmp.height=gridH;
+  tmp.getContext('2d').putImageData(imageData,0,0);
+  ctx.globalCompositeOperation='lighter';
+  ctx.drawImage(tmp,0,0,W,H);
+  ctx.globalCompositeOperation='source-over';
+}
+
+function step(){
+  velStep();
+  densStep(dr,dr0);densStep(dg,dg0);densStep(db,db0);
+  // Slight decay
+  for(let i=0;i<N;i++){
+    dr[i]*=0.998;dg[i]*=0.998;db[i]*=0.998;
+  }
+  render();
+  requestAnimationFrame(step);
+}
+
+// Input
+const hint=document.getElementById('hint');
+let hinted=false;
+function getGrid(ex,ey){return{x:Math.floor(ex/cellSize)+1,y:Math.floor(ey/cellSize)+1}}
+
+function onMove(ex,ey){
+  if(!hinted){hint.style.opacity='0';hinted=true}
+  opx=px;opy=py;px=ex;py=ey;
+  if(pointerDown){
+    const g=getGrid(ex,ey);
+    const vx=(px-opx)*0.3,vy=(py-opy)*0.3;
+    addSource(g.x,g.y,vx,vy,colors[colorIdx]);
+  }
+}
+
+canvas.addEventListener('pointerdown',e=>{pointerDown=true;px=e.clientX;py=e.clientY;opx=px;opy=py;
+  const g=getGrid(px,py);addSource(g.x,g.y,0,0,colors[colorIdx]);});
+canvas.addEventListener('pointermove',e=>{if(pointerDown)onMove(e.clientX,e.clientY)});
+window.addEventListener('pointerup',()=>{pointerDown=false});
+
+// Palette
+const palEl=document.getElementById('palette');
+colors.forEach((c,i)=>{
+  const s=document.createElement('div');s.className='swatch'+(i===0?' active':'');
+  s.style.background=c.hex;s.onclick=()=>{colorIdx=i;document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));s.classList.add('active')};
+  palEl.appendChild(s);
+});
+
+// Gravity toggle
+const btnG=document.getElementById('btnGravity');
+btnG.classList.add('active');
+btnG.onclick=()=>{gravity=!gravity;btnG.classList.toggle('active');btnG.textContent=gravity?'⬇ Gravity':'⊘ No Gravity'};
+
+// Clear
+document.getElementById('btnClear').onclick=()=>{
+  u.fill(0);v.fill(0);dr.fill(0);dg.fill(0);db.fill(0);
+};
+
+step();
+</script>
+</body>
+</html>

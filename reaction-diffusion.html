@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reaction-Diffusion 🐭</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; overflow: hidden; font-family: 'Segoe UI', sans-serif; color: #e0e0e0; }
+canvas { display: block; cursor: crosshair; }
+#controls {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
+  background: rgba(10,10,20,0.85); backdrop-filter: blur(12px);
+  padding: 10px 16px; border-radius: 16px; border: 1px solid rgba(168,85,247,0.3);
+  z-index: 10;
+}
+button {
+  background: rgba(168,85,247,0.2); border: 1px solid rgba(168,85,247,0.4);
+  color: #d8b4fe; padding: 6px 14px; border-radius: 10px; cursor: pointer;
+  font-size: 13px; transition: all 0.2s;
+}
+button:hover { background: rgba(168,85,247,0.4); }
+button.active { background: rgba(168,85,247,0.5); border-color: #a855f7; }
+select {
+  background: rgba(168,85,247,0.2); border: 1px solid rgba(168,85,247,0.4);
+  color: #d8b4fe; padding: 6px 10px; border-radius: 10px; font-size: 13px;
+}
+#hint {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(10,10,20,0.8); backdrop-filter: blur(8px);
+  padding: 8px 16px; border-radius: 12px; border: 1px solid rgba(168,85,247,0.2);
+  font-size: 13px; color: #a78bfa; opacity: 1; transition: opacity 2s;
+  pointer-events: none; z-index: 10;
+}
+#title {
+  position: fixed; top: 16px; right: 16px; font-size: 12px; color: rgba(168,85,247,0.4);
+  z-index: 10; pointer-events: none;
+}
+</style>
+</head>
+<body>
+<div id="hint">Click & drag to seed patterns • Scroll to change brush size</div>
+<div id="title">🐭 Reaction-Diffusion</div>
+<canvas id="c"></canvas>
+<div id="controls">
+  <select id="preset">
+    <option value="mitosis">Mitosis</option>
+    <option value="coral">Coral Growth</option>
+    <option value="spots">Leopard Spots</option>
+    <option value="maze">Labyrinth</option>
+    <option value="waves">Pulse Waves</option>
+    <option value="worms">Worms</option>
+  </select>
+  <select id="palette">
+    <option value="purple">Purple Haze</option>
+    <option value="ocean">Deep Ocean</option>
+    <option value="fire">Magma</option>
+    <option value="mono">Monochrome</option>
+    <option value="neon">Neon</option>
+    <option value="aurora">Aurora</option>
+  </select>
+  <button id="seedBtn">Seed Random</button>
+  <button id="clearBtn">Clear</button>
+  <button id="pauseBtn">Pause</button>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, gW, gH, scale = 2;
+let gridA, gridB, nextA, nextB;
+let paused = false, mouseDown = false, brushR = 12;
+let dA = 1.0, dB = 0.5, feed = 0.055, kill = 0.062;
+
+const presets = {
+  mitosis: { feed: 0.0367, kill: 0.0649 },
+  coral:   { feed: 0.0545, kill: 0.062 },
+  spots:   { feed: 0.030, kill: 0.062 },
+  maze:    { feed: 0.029, kill: 0.057 },
+  waves:   { feed: 0.014, kill: 0.045 },
+  worms:   { feed: 0.078, kill: 0.061 },
+};
+
+const palettes = {
+  purple: (v) => {
+    const t = Math.max(0, Math.min(1, v));
+    return [
+      Math.floor(10 + t * 158),
+      Math.floor(10 + t * 50),
+      Math.floor(15 + t * 232)
+    ];
+  },
+  ocean: (v) => {
+    const t = Math.max(0, Math.min(1, v));
+    return [
+      Math.floor(5 + t * 30),
+      Math.floor(20 + t * 140),
+      Math.floor(40 + t * 215)
+    ];
+  },
+  fire: (v) => {
+    const t = Math.max(0, Math.min(1, v));
+    return [
+      Math.floor(t < 0.5 ? t * 2 * 255 : 255),
+      Math.floor(t < 0.5 ? t * 2 * 80 : 80 + (t - 0.5) * 2 * 175),
+      Math.floor(t * 30)
+    ];
+  },
+  mono: (v) => {
+    const t = Math.max(0, Math.min(1, v));
+    const c = Math.floor(t * 240);
+    return [c, c, c];
+  },
+  neon: (v) => {
+    const t = Math.max(0, Math.min(1, v));
+    return [
+      Math.floor(t < 0.5 ? 255 * t * 2 : 255 - 100 * (t - 0.5) * 2),
+      Math.floor(t * 255),
+      Math.floor(t < 0.3 ? 180 : 180 - t * 120)
+    ];
+  },
+  aurora: (v) => {
+    const t = Math.max(0, Math.min(1, v));
+    const h = 120 + t * 180;
+    // HSL to RGB shortcut
+    const s = 0.8, l = t * 0.55;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c / 2;
+    let r, g, b;
+    if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    return [Math.floor((r + m) * 255), Math.floor((g + m) * 255), Math.floor((b + m) * 255)];
+  }
+};
+
+let currentPalette = 'purple';
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+  gW = Math.floor(W / scale); gH = Math.floor(H / scale);
+  init();
+}
+
+function init() {
+  gridA = new Float32Array(gW * gH).fill(1);
+  gridB = new Float32Array(gW * gH).fill(0);
+  nextA = new Float32Array(gW * gH);
+  nextB = new Float32Array(gW * gH);
+}
+
+function seedRandom() {
+  for (let i = 0; i < 20; i++) {
+    const cx = Math.floor(Math.random() * gW);
+    const cy = Math.floor(Math.random() * gH);
+    const r = 3 + Math.floor(Math.random() * 8);
+    addSeed(cx, cy, r);
+  }
+}
+
+function addSeed(cx, cy, r) {
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy <= r * r) {
+        const x = (cx + dx + gW) % gW;
+        const y = (cy + dy + gH) % gH;
+        const idx = y * gW + x;
+        gridB[idx] = 1;
+        gridA[idx] = 0;
+      }
+    }
+  }
+}
+
+function laplacian(grid, x, y) {
+  const w = gW, h = gH;
+  const xm = (x - 1 + w) % w, xp = (x + 1) % w;
+  const ym = (y - 1 + h) % h, yp = (y + 1) % h;
+  const idx = y * w + x;
+  return (
+    grid[ym * w + xm] * 0.05 + grid[ym * w + x] * 0.2 + grid[ym * w + xp] * 0.05 +
+    grid[y * w + xm] * 0.2  - grid[idx]              + grid[y * w + xp] * 0.2 +
+    grid[yp * w + xm] * 0.05 + grid[yp * w + x] * 0.2 + grid[yp * w + xp] * 0.05
+  );
+}
+
+function step() {
+  const dt = 1.0;
+  for (let y = 0; y < gH; y++) {
+    for (let x = 0; x < gW; x++) {
+      const idx = y * gW + x;
+      const a = gridA[idx], b = gridB[idx];
+      const la = laplacian(gridA, x, y);
+      const lb = laplacian(gridB, x, y);
+      const abb = a * b * b;
+      nextA[idx] = a + (dA * la - abb + feed * (1 - a)) * dt;
+      nextB[idx] = b + (dB * lb + abb - (kill + feed) * b) * dt;
+      nextA[idx] = Math.max(0, Math.min(1, nextA[idx]));
+      nextB[idx] = Math.max(0, Math.min(1, nextB[idx]));
+    }
+  }
+  [gridA, nextA] = [nextA, gridA];
+  [gridB, nextB] = [nextB, gridB];
+}
+
+function render() {
+  const img = ctx.createImageData(gW, gH);
+  const pal = palettes[currentPalette];
+  for (let i = 0; i < gW * gH; i++) {
+    const v = gridA[i] - gridB[i];
+    const val = (1 - v) * 0.5 + gridB[i] * 0.5;
+    const [r, g, b] = pal(val);
+    const p = i * 4;
+    img.data[p] = r;
+    img.data[p + 1] = g;
+    img.data[p + 2] = b;
+    img.data[p + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  // Scale up
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(canvas, 0, 0, gW, gH, 0, 0, W, H);
+  ctx.restore();
+}
+
+function frame() {
+  if (!paused) {
+    for (let i = 0; i < 8; i++) step();
+    render();
+  }
+  requestAnimationFrame(frame);
+}
+
+function applyPreset(name) {
+  const p = presets[name];
+  if (p) { feed = p.feed; kill = p.kill; }
+}
+
+// Events
+canvas.addEventListener('mousedown', (e) => { mouseDown = true; paint(e); });
+canvas.addEventListener('mousemove', (e) => { if (mouseDown) paint(e); });
+canvas.addEventListener('mouseup', () => mouseDown = false);
+canvas.addEventListener('mouseleave', () => mouseDown = false);
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); mouseDown = true; paint(e.touches[0]); });
+canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (mouseDown) paint(e.touches[0]); });
+canvas.addEventListener('touchend', () => mouseDown = false);
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  brushR = Math.max(3, Math.min(40, brushR - Math.sign(e.deltaY) * 2));
+});
+
+function paint(e) {
+  const cx = Math.floor(e.clientX / scale);
+  const cy = Math.floor(e.clientY / scale);
+  addSeed(cx, cy, Math.floor(brushR / scale));
+}
+
+document.getElementById('preset').addEventListener('change', (e) => {
+  applyPreset(e.target.value);
+});
+document.getElementById('palette').addEventListener('change', (e) => {
+  currentPalette = e.target.value;
+});
+document.getElementById('seedBtn').addEventListener('click', seedRandom);
+document.getElementById('clearBtn').addEventListener('click', init);
+document.getElementById('pauseBtn').addEventListener('click', () => {
+  paused = !paused;
+  document.getElementById('pauseBtn').textContent = paused ? 'Play' : 'Pause';
+});
+
+window.addEventListener('resize', resize);
+resize();
+applyPreset('mitosis');
+seedRandom();
+
+setTimeout(() => { document.getElementById('hint').style.opacity = 0; }, 4000);
+
+frame();
+</script>
+</body>
+</html>

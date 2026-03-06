@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spirograph ✿</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a12; overflow: hidden; font-family: 'Segoe UI', sans-serif; cursor: crosshair; }
+canvas { display: block; }
+#ui {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 12px; align-items: center; padding: 12px 20px;
+  background: rgba(20,20,35,0.85); border-radius: 16px; border: 1px solid rgba(140,100,255,0.3);
+  backdrop-filter: blur(10px); transition: opacity 0.4s; z-index: 10;
+}
+#ui.hidden { opacity: 0; pointer-events: none; }
+.ctrl { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ctrl label { color: rgba(200,180,255,0.7); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.ctrl input[type=range] { width: 90px; accent-color: #8c64ff; }
+.ctrl select { background: rgba(40,30,70,0.8); color: #c8b4ff; border: 1px solid rgba(140,100,255,0.3); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+button {
+  background: rgba(140,100,255,0.2); color: #c8b4ff; border: 1px solid rgba(140,100,255,0.4);
+  border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 12px; transition: all 0.2s;
+}
+button:hover { background: rgba(140,100,255,0.4); }
+#info {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  color: rgba(200,180,255,0.5); font-size: 12px; transition: opacity 1s;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">click anywhere to start a new pattern · scroll to change speed</div>
+<div id="ui">
+  <div class="ctrl">
+    <label>R</label>
+    <input type="range" id="rOuter" min="40" max="300" value="180">
+  </div>
+  <div class="ctrl">
+    <label>r</label>
+    <input type="range" id="rInner" min="10" max="150" value="67">
+  </div>
+  <div class="ctrl">
+    <label>Offset</label>
+    <input type="range" id="rOffset" min="5" max="150" value="52">
+  </div>
+  <div class="ctrl">
+    <label>Palette</label>
+    <select id="palette">
+      <option value="rainbow">Rainbow</option>
+      <option value="purple" selected>Purple Haze</option>
+      <option value="neon">Neon</option>
+      <option value="fire">Fire</option>
+      <option value="ocean">Ocean</option>
+      <option value="pastel">Pastel</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>Gears</label>
+    <input type="checkbox" id="showGears">
+  </div>
+  <button id="btnClear">Clear</button>
+  <button id="btnRandom">Random</button>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize();
+addEventListener('resize', resize);
+
+const palettes = {
+  rainbow: t => `hsl(${(t * 60) % 360}, 85%, 60%)`,
+  purple: t => `hsl(${260 + Math.sin(t * 0.3) * 30}, 75%, ${50 + Math.sin(t * 0.5) * 15}%)`,
+  neon: t => `hsl(${[300, 180, 120, 60][(Math.floor(t * 2)) % 4]}, 100%, 55%)`,
+  fire: t => `hsl(${(t * 20) % 60}, 95%, ${45 + Math.sin(t) * 15}%)`,
+  ocean: t => `hsl(${190 + Math.sin(t * 0.4) * 30}, 70%, ${40 + Math.sin(t * 0.7) * 20}%)`,
+  pastel: t => `hsl(${(t * 40) % 360}, 60%, 75%)`
+};
+
+let R = 180, r = 67, d = 52;
+let cx = W / 2, cy = H / 2;
+let t = 0, speed = 0.03, drawing = true;
+let prevX = null, prevY = null;
+let trailCanvas, trailCtx;
+let showGears = false;
+let uiTimeout;
+
+function initTrail() {
+  trailCanvas = document.createElement('canvas');
+  trailCanvas.width = W; trailCanvas.height = H;
+  trailCtx = trailCanvas.getContext('2d');
+}
+initTrail();
+
+addEventListener('resize', () => { 
+  const old = trailCanvas;
+  initTrail();
+  trailCtx.drawImage(old, 0, 0);
+});
+
+function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+function totalRevolutions() { return r / gcd(R, r); }
+
+function spiroX(t) { return cx + (R - r) * Math.cos(t) + d * Math.cos((R - r) / r * t); }
+function spiroY(t) { return cy + (R - r) * Math.sin(t) - d * Math.sin((R - r) / r * t); }
+
+function getColor(t) { return palettes[document.getElementById('palette').value](t); }
+
+function drawGears() {
+  const cxG = (R - r) * Math.cos(t);
+  const cyG = (R - r) * Math.sin(t);
+  
+  ctx.save();
+  ctx.translate(cx, cy);
+  
+  // Outer circle
+  ctx.strokeStyle = 'rgba(140,100,255,0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // Inner circle
+  ctx.strokeStyle = 'rgba(140,100,255,0.3)';
+  ctx.beginPath();
+  ctx.arc(cxG, cyG, r, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // Pen arm
+  const px = spiroX(t) - cx;
+  const py = spiroY(t) - cy;
+  ctx.strokeStyle = 'rgba(255,200,100,0.4)';
+  ctx.beginPath();
+  ctx.moveTo(cxG, cyG);
+  ctx.lineTo(px, py);
+  ctx.stroke();
+  
+  // Pen dot
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(px, py, 3, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+function update() {
+  if (!drawing) return;
+  
+  const steps = 8;
+  for (let i = 0; i < steps; i++) {
+    const x = spiroX(t);
+    const y = spiroY(t);
+    
+    if (prevX !== null) {
+      trailCtx.strokeStyle = getColor(t);
+      trailCtx.lineWidth = 1.5;
+      trailCtx.globalAlpha = 0.9;
+      trailCtx.beginPath();
+      trailCtx.moveTo(prevX, prevY);
+      trailCtx.lineTo(x, y);
+      trailCtx.stroke();
+    }
+    prevX = x; prevY = y;
+    t += speed;
+  }
+  
+  // Check if pattern completed
+  const fullT = totalRevolutions() * Math.PI * 2;
+  if (t >= fullT + 0.1) drawing = false;
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(trailCanvas, 0, 0);
+  if (showGears && drawing) drawGears();
+  update();
+  requestAnimationFrame(render);
+}
+
+function startNew(x, y) {
+  cx = x || W / 2; cy = y || H / 2;
+  R = +document.getElementById('rOuter').value;
+  r = +document.getElementById('rInner').value;
+  d = +document.getElementById('rOffset').value;
+  t = 0; prevX = null; prevY = null;
+  drawing = true;
+  document.getElementById('info').style.opacity = '0';
+}
+
+function randomize() {
+  document.getElementById('rOuter').value = R = 60 + Math.random() * 240 | 0;
+  document.getElementById('rInner').value = r = 10 + Math.random() * (R * 0.6) | 0;
+  document.getElementById('rOffset').value = d = 5 + Math.random() * (r * 1.5) | 0;
+  document.getElementById('palette').value = Object.keys(palettes)[Math.random() * 6 | 0];
+  startNew();
+}
+
+canvas.addEventListener('click', e => startNew(e.clientX, e.clientY));
+canvas.addEventListener('wheel', e => {
+  speed = Math.max(0.005, Math.min(0.15, speed + (e.deltaY > 0 ? -0.005 : 0.005)));
+  e.preventDefault();
+}, { passive: false });
+
+document.getElementById('btnClear').onclick = () => {
+  trailCtx.clearRect(0, 0, W, H);
+  prevX = null; drawing = false;
+};
+document.getElementById('btnRandom').onclick = randomize;
+document.getElementById('showGears').onchange = e => showGears = e.target.checked;
+
+// Auto-hide UI
+let hideTimer;
+function showUI() {
+  document.getElementById('ui').classList.remove('hidden');
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => document.getElementById('ui').classList.add('hidden'), 5000);
+}
+document.addEventListener('mousemove', e => { if (e.clientY > H - 150) showUI(); });
+showUI();
+
+startNew();
+render();
+</script>
+</body>
+</html>

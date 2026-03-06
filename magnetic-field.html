@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magnetic Field Visualizer 🧲</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a14;overflow:hidden;font-family:'Segoe UI',sans-serif;color:#e0e0e0;user-select:none}
+canvas{display:block}
+#ui{position:fixed;top:12px;left:12px;z-index:10;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#ui button{background:rgba(120,80,200,0.3);border:1px solid rgba(120,80,200,0.5);color:#d0c0f0;padding:6px 14px;border-radius:16px;cursor:pointer;font-size:13px;transition:all .2s}
+#ui button:hover{background:rgba(120,80,200,0.5)}
+#ui button.active{background:rgba(120,80,200,0.6);border-color:#a080e0}
+#info{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);font-size:12px;color:rgba(200,180,240,0.5);text-align:center}
+#title{position:fixed;top:12px;right:16px;font-size:14px;color:rgba(200,180,240,0.4)}
+.polarity-indicator{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:middle}
+</style>
+</head>
+<body>
+<div id="ui">
+  <button id="btnN" class="active"><span class="polarity-indicator" style="background:#ff4466"></span>North</button>
+  <button id="btnS"><span class="polarity-indicator" style="background:#4488ff"></span>South</button>
+  <button id="btnDipole">Dipole</button>
+  <button id="btnClear">Clear</button>
+  <button id="btnFieldLines">Field Lines</button>
+  <button id="btnFilings" class="active">Iron Filings</button>
+</div>
+<div id="title">🧲 Magnetic Field</div>
+<div id="info">Click to place magnets · Drag to move · Right-click to remove · Scroll to adjust strength</div>
+<canvas id="c"></canvas>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=innerWidth;H=canvas.height=innerHeight}
+resize();addEventListener('resize',resize);
+
+const magnets=[];
+let placePole='N'; // N, S, or dipole
+let showFilings=true, showFieldLines=false;
+let dragIdx=-1, dragOff={x:0,y:0};
+
+// Iron filings
+let filings=[];
+function initFilings(){
+  filings=[];
+  const count=Math.min(8000,Math.floor(W*H/120));
+  for(let i=0;i<count;i++){
+    filings.push({x:Math.random()*W,y:Math.random()*H,len:3+Math.random()*5});
+  }
+}
+initFilings();
+addEventListener('resize',initFilings);
+
+function fieldAt(x,y){
+  let bx=0,by=0;
+  for(const m of magnets){
+    for(const p of m.poles){
+      const dx=x-p.x,dy=y-p.y;
+      const r2=dx*dx+dy*dy+100;
+      const r=Math.sqrt(r2);
+      const strength=p.charge*m.strength/(r2);
+      bx+=strength*dx/r;
+      by+=strength*dy/r;
+    }
+  }
+  return{x:bx,y:by};
+}
+
+function drawFilings(){
+  for(const f of filings){
+    const b=fieldAt(f.x,f.y);
+    const mag=Math.sqrt(b.x*b.x+b.y*b.y);
+    if(mag<0.00001)continue;
+    const nx=b.x/mag,ny=b.y/mag;
+    const intensity=Math.min(1,mag*15);
+    // Color by field direction blend
+    const r=Math.floor(140+80*intensity);
+    const g=Math.floor(120+60*intensity);
+    const bl=Math.floor(180+75*intensity);
+    ctx.strokeStyle=`rgba(${r},${g},${bl},${0.15+intensity*0.6})`;
+    ctx.lineWidth=0.8+intensity*0.8;
+    ctx.beginPath();
+    const hl=f.len*0.5*(0.5+intensity*0.5);
+    ctx.moveTo(f.x-nx*hl,f.y-ny*hl);
+    ctx.lineTo(f.x+nx*hl,f.y+ny*hl);
+    ctx.stroke();
+  }
+}
+
+function drawFieldLines(){
+  const steps=200,ds=4;
+  for(const m of magnets){
+    for(const p of m.poles){
+      if(p.charge<0)continue; // start from north poles
+      const numLines=12;
+      for(let i=0;i<numLines;i++){
+        const angle=i*Math.PI*2/numLines;
+        let x=p.x+Math.cos(angle)*8;
+        let y=p.y+Math.sin(angle)*8;
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+        let valid=true;
+        for(let s=0;s<steps;s++){
+          const b=fieldAt(x,y);
+          const mag=Math.sqrt(b.x*b.x+b.y*b.y);
+          if(mag<0.0001){valid=false;break}
+          x+=b.x/mag*ds;
+          y+=b.y/mag*ds;
+          if(x<-50||x>W+50||y<-50||y>H+50){valid=false;break}
+          ctx.lineTo(x,y);
+          // Check if we hit a south pole
+          for(const m2 of magnets){
+            for(const p2 of m2.poles){
+              if(p2.charge>=0)continue;
+              const dx=x-p2.x,dy=y-p2.y;
+              if(dx*dx+dy*dy<64){valid=false;break}
+            }
+            if(!valid)break;
+          }
+          if(!valid)break;
+        }
+        const grad=ctx.createLinearGradient(p.x,p.y,x,y);
+        grad.addColorStop(0,'rgba(255,100,120,0.4)');
+        grad.addColorStop(1,'rgba(80,140,255,0.4)');
+        ctx.strokeStyle=grad;
+        ctx.lineWidth=1.2;
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function drawMagnets(){
+  for(const m of magnets){
+    for(const p of m.poles){
+      const isN=p.charge>0;
+      const color=isN?'#ff4466':'#4488ff';
+      const glow=isN?'rgba(255,68,102,0.3)':'rgba(68,136,255,0.3)';
+      // Glow
+      const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,30*m.strength/500);
+      g.addColorStop(0,glow);
+      g.addColorStop(1,'transparent');
+      ctx.fillStyle=g;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,30*m.strength/500,0,Math.PI*2);
+      ctx.fill();
+      // Core
+      ctx.fillStyle=color;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,8,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle='#fff';
+      ctx.font='bold 10px sans-serif';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillText(isN?'N':'S',p.x,p.y);
+    }
+    // Draw bar between dipole poles
+    if(m.poles.length===2){
+      ctx.strokeStyle='rgba(200,180,240,0.2)';
+      ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.moveTo(m.poles[0].x,m.poles[0].y);
+      ctx.lineTo(m.poles[1].x,m.poles[1].y);
+      ctx.stroke();
+    }
+  }
+}
+
+function frame(){
+  ctx.fillStyle='rgba(10,10,20,1)';
+  ctx.fillRect(0,0,W,H);
+  if(magnets.length>0){
+    if(showFilings)drawFilings();
+    if(showFieldLines)drawFieldLines();
+  }
+  drawMagnets();
+  requestAnimationFrame(frame);
+}
+frame();
+
+// UI
+const btnN=document.getElementById('btnN');
+const btnS=document.getElementById('btnS');
+const btnDipole=document.getElementById('btnDipole');
+const btnClear=document.getElementById('btnClear');
+const btnFL=document.getElementById('btnFieldLines');
+const btnFi=document.getElementById('btnFilings');
+
+function setMode(m){
+  placePole=m;
+  btnN.classList.toggle('active',m==='N');
+  btnS.classList.toggle('active',m==='S');
+  btnDipole.classList.toggle('active',m==='dipole');
+}
+btnN.onclick=()=>setMode('N');
+btnS.onclick=()=>setMode('S');
+btnDipole.onclick=()=>setMode('dipole');
+btnClear.onclick=()=>{magnets.length=0};
+btnFL.onclick=()=>{showFieldLines=!showFieldLines;btnFL.classList.toggle('active',showFieldLines)};
+btnFi.onclick=()=>{showFilings=!showFilings;btnFi.classList.toggle('active',showFilings)};
+
+function findMagnetAt(x,y){
+  for(let i=magnets.length-1;i>=0;i--){
+    for(const p of magnets[i].poles){
+      const dx=x-p.x,dy=y-p.y;
+      if(dx*dx+dy*dy<400)return i;
+    }
+  }
+  return -1;
+}
+
+canvas.addEventListener('mousedown',e=>{
+  if(e.button===2){
+    const idx=findMagnetAt(e.clientX,e.clientY);
+    if(idx>=0)magnets.splice(idx,1);
+    return;
+  }
+  const idx=findMagnetAt(e.clientX,e.clientY);
+  if(idx>=0){
+    dragIdx=idx;
+    const m=magnets[idx];
+    const cx=(m.poles[0].x+(m.poles.length>1?m.poles[1].x:m.poles[0].x))/m.poles.length;
+    const cy=(m.poles[0].y+(m.poles.length>1?m.poles[1].y:m.poles[0].y))/m.poles.length;
+    dragOff={x:cx-e.clientX,y:cy-e.clientY};
+  } else {
+    const x=e.clientX,y=e.clientY;
+    if(placePole==='dipole'){
+      magnets.push({strength:500,poles:[{x:x-20,y,charge:1},{x:x+20,y,charge:-1}]});
+    } else {
+      magnets.push({strength:500,poles:[{x,y,charge:placePole==='N'?1:-1}]});
+    }
+  }
+});
+
+canvas.addEventListener('mousemove',e=>{
+  if(dragIdx<0)return;
+  const m=magnets[dragIdx];
+  const cx=(m.poles[0].x+(m.poles.length>1?m.poles[1].x:m.poles[0].x))/m.poles.length;
+  const cy=(m.poles[0].y+(m.poles.length>1?m.poles[1].y:m.poles[0].y))/m.poles.length;
+  const dx=e.clientX+dragOff.x-cx;
+  const dy=e.clientY+dragOff.y-cy;
+  for(const p of m.poles){p.x+=dx;p.y+=dy}
+});
+
+canvas.addEventListener('mouseup',()=>{dragIdx=-1});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+canvas.addEventListener('wheel',e=>{
+  const idx=findMagnetAt(e.clientX,e.clientY);
+  if(idx>=0){
+    magnets[idx].strength=Math.max(100,Math.min(2000,magnets[idx].strength-e.deltaY));
+    e.preventDefault();
+  }
+},{passive:false});
+
+// Touch support
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const t=e.touches[0];
+  const idx=findMagnetAt(t.clientX,t.clientY);
+  if(idx>=0){
+    dragIdx=idx;
+    const m=magnets[idx];
+    const cx=m.poles.reduce((s,p)=>s+p.x,0)/m.poles.length;
+    const cy=m.poles.reduce((s,p)=>s+p.y,0)/m.poles.length;
+    dragOff={x:cx-t.clientX,y:cy-t.clientY};
+  } else {
+    const x=t.clientX,y=t.clientY;
+    if(placePole==='dipole'){
+      magnets.push({strength:500,poles:[{x:x-20,y,charge:1},{x:x+20,y,charge:-1}]});
+    } else {
+      magnets.push({strength:500,poles:[{x,y,charge:placePole==='N'?1:-1}]});
+    }
+  }
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(dragIdx<0)return;
+  const t=e.touches[0];
+  const m=magnets[dragIdx];
+  const cx=m.poles.reduce((s,p)=>s+p.x,0)/m.poles.length;
+  const cy=m.poles.reduce((s,p)=>s+p.y,0)/m.poles.length;
+  const dx=t.clientX+dragOff.x-cx;
+  const dy=t.clientY+dragOff.y-cy;
+  for(const p of m.poles){p.x+=dx;p.y+=dy}
+},{passive:false});
+canvas.addEventListener('touchend',()=>{dragIdx=-1});
+</script>
+</body>
+</html>

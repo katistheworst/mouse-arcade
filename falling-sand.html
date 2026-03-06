@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Falling Sand 🏜️</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;overflow:hidden;font-family:'Segoe UI',sans-serif;color:#e0e0e0;touch-action:none;user-select:none}
+canvas{display:block;cursor:crosshair;image-rendering:pixelated}
+#ui{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;opacity:1;transition:opacity .3s;flex-wrap:wrap;justify-content:center;max-width:95vw}
+#ui.hidden{opacity:0}
+#ui:hover{opacity:1}
+.btn{padding:8px 14px;border:none;border-radius:8px;font-size:13px;cursor:pointer;transition:all .15s;font-weight:600;letter-spacing:.3px}
+.btn:hover{transform:scale(1.05)}
+.btn.active{box-shadow:0 0 12px rgba(255,255,255,.3);transform:scale(1.08)}
+.mat-sand{background:#d4a853;color:#2a1f0a}.mat-sand.active{background:#f0c060}
+.mat-water{background:#3a7bd5;color:#fff}.mat-water.active{background:#5a9bf5}
+.mat-stone{background:#6a6a7a;color:#fff}.mat-stone.active{background:#8a8a9a}
+.mat-fire{background:#d44a00;color:#fff}.mat-fire.active{background:#ff6a20}
+.mat-oil{background:#4a3a2a;color:#ddd}.mat-oil.active{background:#6a5a4a}
+.mat-acid{background:#40a030;color:#fff}.mat-acid.active{background:#60c050}
+.mat-plant{background:#2a8040;color:#fff}.mat-plant.active{background:#3aa050}
+.mat-lava{background:#c03000;color:#fff}.mat-lava.active{background:#e05020}
+.mat-erase{background:#333;color:#fff}.mat-erase.active{background:#555}
+#brush-info{position:fixed;top:12px;left:50%;transform:translateX(-50%);font-size:12px;color:#888;z-index:10;text-align:center}
+#stats{position:fixed;top:12px;right:12px;font-size:11px;color:#666;z-index:10}
+</style>
+</head>
+<body>
+<div id="brush-info">Scroll to change brush size · Click & drag to pour</div>
+<div id="stats"></div>
+<canvas id="c"></canvas>
+<div id="ui">
+<button class="btn mat-sand active" onclick="setMat('sand')">🏜️ Sand</button>
+<button class="btn mat-water" onclick="setMat('water')">💧 Water</button>
+<button class="btn mat-stone" onclick="setMat('stone')">🪨 Stone</button>
+<button class="btn mat-fire" onclick="setMat('fire')">🔥 Fire</button>
+<button class="btn mat-oil" onclick="setMat('oil')">🛢️ Oil</button>
+<button class="btn mat-acid" onclick="setMat('acid')">🧪 Acid</button>
+<button class="btn mat-plant" onclick="setMat('plant')">🌱 Plant</button>
+<button class="btn mat-lava" onclick="setMat('lava')">🌋 Lava</button>
+<button class="btn mat-erase" onclick="setMat('erase')">🗑️ Erase</button>
+<button class="btn" style="background:#222;color:#aaa" onclick="clearAll()">Clear</button>
+</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+const SCALE=3;
+let W,H,gw,gh,grid,updated;
+const EMPTY=0,SAND=1,WATER=2,STONE=3,FIRE=4,OIL=5,ACID=6,PLANT=7,LAVA=8;
+let curMat='sand',matId=SAND,brushR=4,pouring=false,mx=0,my=0;
+const matMap={sand:SAND,water:WATER,stone:STONE,fire:FIRE,oil:OIL,acid:ACID,plant:PLANT,lava:LAVA,erase:EMPTY};
+
+function resize(){
+  W=window.innerWidth;H=window.innerHeight;
+  C.width=W;C.height=H;
+  gw=Math.floor(W/SCALE);gh=Math.floor(H/SCALE);
+  grid=new Uint8Array(gw*gh);
+  updated=new Uint8Array(gw*gh);
+}
+resize();
+window.addEventListener('resize',resize);
+
+function idx(x,y){return y*gw+x}
+function get(x,y){return(x<0||x>=gw||y<0||y>=gh)?STONE:grid[idx(x,y)]}
+function set(x,y,v){if(x>=0&&x<gw&&y>=0&&y<gh)grid[idx(x,y)]=v}
+
+function swap(x1,y1,x2,y2){
+  if(x2<0||x2>=gw||y2<0||y2>=gh)return false;
+  const a=idx(x1,y1),b=idx(x2,y2);
+  const t=grid[a];grid[a]=grid[b];grid[b]=t;
+  updated[a]=1;updated[b]=1;
+  return true;
+}
+
+function color(type,x,y){
+  const n=((x*7+y*13+x*y)&0xff)/255;
+  switch(type){
+    case SAND:return`rgb(${200+n*40|0},${160+n*30|0},${60+n*30|0})`;
+    case WATER:return`rgba(${40+n*20|0},${100+n*30|0},${200+n*40|0},.85)`;
+    case STONE:return`rgb(${90+n*30|0},${90+n*30|0},${100+n*20|0})`;
+    case FIRE:return`rgb(${220+n*35|0},${80+n*120|0},${n*40|0})`;
+    case OIL:return`rgb(${50+n*20|0},${40+n*15|0},${30+n*10|0})`;
+    case ACID:return`rgb(${40+n*30|0},${180+n*60|0},${20+n*30|0})`;
+    case PLANT:return`rgb(${30+n*20|0},${100+n*50|0},${30+n*20|0})`;
+    case LAVA:return`rgb(${200+n*55|0},${40+n*60|0},${0})`;
+    default:return'';
+  }
+}
+
+function isLiquid(t){return t===WATER||t===OIL||t===ACID||t===LAVA}
+function isEmpty(t){return t===EMPTY}
+function canDisplace(mover,target){
+  if(isEmpty(target))return true;
+  if(mover===SAND&&isLiquid(target))return true;
+  if(mover===LAVA&&(target===WATER||target===OIL))return true;
+  return false;
+}
+
+function simulate(){
+  updated.fill(0);
+  // alternate scan direction each frame for symmetry
+  const lr=Math.random()>.5;
+  for(let y=gh-2;y>=0;y--){
+    const sx=lr?0:gw-1, ex=lr?gw:(-1), dx=lr?1:(-1);
+    for(let x=sx;x!==ex;x+=dx){
+      const i=idx(x,y);
+      if(updated[i])continue;
+      const t=grid[i];
+      if(t===EMPTY)continue;
+
+      if(t===SAND){
+        if(canDisplace(SAND,get(x,y+1))){swap(x,y,x,y+1)}
+        else{
+          const d=Math.random()>.5?1:-1;
+          if(canDisplace(SAND,get(x+d,y+1)))swap(x,y,x+d,y+1);
+          else if(canDisplace(SAND,get(x-d,y+1)))swap(x,y,x-d,y+1);
+        }
+      }
+      else if(t===WATER){
+        if(isEmpty(get(x,y+1)))swap(x,y,x,y+1);
+        else{
+          const d=Math.random()>.5?1:-1;
+          if(isEmpty(get(x+d,y+1)))swap(x,y,x+d,y+1);
+          else if(isEmpty(get(x-d,y+1)))swap(x,y,x-d,y+1);
+          else{
+            const spread=Math.random()>.5?1:-1;
+            if(isEmpty(get(x+spread,y)))swap(x,y,x+spread,y);
+            else if(isEmpty(get(x-spread,y)))swap(x,y,x-spread,y);
+          }
+        }
+      }
+      else if(t===OIL){
+        // oil floats on water
+        if(get(x,y+1)===WATER){swap(x,y,x,y+1)}
+        else if(isEmpty(get(x,y+1)))swap(x,y,x,y+1);
+        else{
+          const d=Math.random()>.5?1:-1;
+          if(isEmpty(get(x+d,y+1)))swap(x,y,x+d,y+1);
+          else if(isEmpty(get(x-d,y+1)))swap(x,y,x-d,y+1);
+          else if(isEmpty(get(x+d,y)))swap(x,y,x+d,y);
+          else if(isEmpty(get(x-d,y)))swap(x,y,x-d,y);
+        }
+      }
+      else if(t===FIRE){
+        // fire rises, burns oil/plant, evaporates water, dies randomly
+        if(Math.random()<.03){set(x,y,EMPTY);continue}
+        // burn neighbors
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+          const nb=get(x+dx,y+dy);
+          if(nb===OIL||nb===PLANT){if(Math.random()<.4)set(x+dx,y+dy,FIRE)}
+          if(nb===WATER){set(x+dx,y+dy,EMPTY);set(x,y,EMPTY);continue}
+        }
+        // rise
+        if(isEmpty(get(x,y-1)))swap(x,y,x,y-1);
+        else{
+          const d=Math.random()>.5?1:-1;
+          if(isEmpty(get(x+d,y-1)))swap(x,y,x+d,y-1);
+          else if(isEmpty(get(x+d,y)))swap(x,y,x+d,y);
+        }
+      }
+      else if(t===ACID){
+        // dissolves non-acid, non-empty below and beside
+        let dissolved=false;
+        if(!isEmpty(get(x,y+1))&&get(x,y+1)!==ACID&&get(x,y+1)!==STONE){
+          if(Math.random()<.15){set(x,y+1,EMPTY);if(Math.random()<.5)set(x,y,EMPTY);dissolved=true}
+        }
+        if(!dissolved){
+          if(isEmpty(get(x,y+1)))swap(x,y,x,y+1);
+          else{
+            const d=Math.random()>.5?1:-1;
+            if(isEmpty(get(x+d,y+1)))swap(x,y,x+d,y+1);
+            else if(isEmpty(get(x+d,y)))swap(x,y,x+d,y);
+            else if(isEmpty(get(x-d,y)))swap(x,y,x-d,y);
+          }
+        }
+      }
+      else if(t===PLANT){
+        // grow upward/sideways slowly if touching water
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+          if(get(x+dx,y+dy)===WATER&&Math.random()<.008){
+            // grow in a random empty neighbor
+            const gd=Math.random()>.6?-1:(Math.random()>.5?1:0);
+            const gx=x+(Math.random()>.5?1:-1)*(Math.random()>.7?1:0);
+            const gy=y+gd;
+            if(isEmpty(get(gx,gy)))set(gx,gy,PLANT);
+            set(x+dx,y+dy,EMPTY); // consume water
+          }
+        }
+      }
+      else if(t===LAVA){
+        // lava flows like water but ignites things and hardens with water
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+          const nb=get(x+dx,y+dy);
+          if(nb===WATER){set(x+dx,y+dy,STONE);set(x,y,STONE);continue}
+          if((nb===OIL||nb===PLANT)&&Math.random()<.3)set(x+dx,y+dy,FIRE);
+        }
+        if(grid[i]!==LAVA)continue; // turned to stone
+        if(isEmpty(get(x,y+1)))swap(x,y,x,y+1);
+        else{
+          const d=Math.random()>.5?1:-1;
+          if(isEmpty(get(x+d,y+1)))swap(x,y,x+d,y+1);
+          else if(Math.random()<.3){
+            if(isEmpty(get(x+d,y)))swap(x,y,x+d,y);
+          }
+        }
+      }
+    }
+  }
+}
+
+function render(){
+  X.fillStyle='#0a0a12';
+  X.fillRect(0,0,W,H);
+  for(let y=0;y<gh;y++){
+    for(let x=0;x<gw;x++){
+      const t=grid[idx(x,y)];
+      if(t===EMPTY)continue;
+      X.fillStyle=color(t,x,y);
+      X.fillRect(x*SCALE,y*SCALE,SCALE,SCALE);
+    }
+  }
+}
+
+function pour(){
+  if(!pouring)return;
+  const gx=Math.floor(mx/SCALE),gy=Math.floor(my/SCALE);
+  const id=matMap[curMat];
+  for(let dy=-brushR;dy<=brushR;dy++){
+    for(let dx=-brushR;dx<=brushR;dx++){
+      if(dx*dx+dy*dy>brushR*brushR)continue;
+      if(Math.random()<.6)continue; // sparse pour
+      const px=gx+dx,py=gy+dy;
+      if(px<0||px>=gw||py<0||py>=gh)continue;
+      if(id===EMPTY){set(px,py,EMPTY)}
+      else if(get(px,py)===EMPTY){set(px,py,id)}
+    }
+  }
+}
+
+let count=0;
+function loop(){
+  pour();
+  simulate();
+  render();
+  if(++count%30===0){
+    let n=0;for(let i=0;i<grid.length;i++)if(grid[i])n++;
+    document.getElementById('stats').textContent=n.toLocaleString()+' particles';
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+
+function setMat(m){
+  curMat=m;matId=matMap[m];
+  document.querySelectorAll('.btn').forEach(b=>{
+    if(b.classList.contains('mat-'+m))b.classList.add('active');
+    else b.classList.remove('active');
+  });
+}
+function clearAll(){grid.fill(0)}
+
+C.addEventListener('pointerdown',e=>{pouring=true;mx=e.clientX;my=e.clientY;C.setPointerCapture(e.pointerId)});
+C.addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY});
+C.addEventListener('pointerup',()=>pouring=false);
+C.addEventListener('pointercancel',()=>pouring=false);
+window.addEventListener('wheel',e=>{
+  brushR=Math.max(1,Math.min(20,brushR+(e.deltaY>0?-1:1)));
+  document.getElementById('brush-info').textContent=`Brush: ${brushR} · Scroll to resize · Click & drag to pour`;
+},{passive:true});
+
+// keyboard shortcuts
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  const map={1:'sand',2:'water',3:'stone',4:'fire',5:'oil',6:'acid',7:'plant',8:'lava',0:'erase',c:'clear'};
+  if(map[k]){if(k==='c')clearAll();else setMat(map[k])}
+});
+</script>
+</body>
+</html>
