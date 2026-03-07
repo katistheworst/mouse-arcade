@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔬 Cellular Automata Lab</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0a0a12;
+    --surface: #13131f;
+    --surface2: #1c1c2e;
+    --border: #2a2a45;
+    --purple: #9b72cf;
+    --purple-light: #c4a0f0;
+    --text: #e0d4f7;
+    --muted: #7060a0;
+    --accent: #d4a0ff;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #stars {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .layout {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+  }
+  header .rule-name {
+    font-size: 0.85rem;
+    color: var(--muted);
+    flex: 1;
+  }
+  .stats {
+    display: flex;
+    gap: 16px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .stats span { color: var(--purple-light); font-variant-numeric: tabular-nums; }
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  aside {
+    width: 240px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+    padding: 12px;
+    gap: 12px;
+  }
+  aside::-webkit-scrollbar { width: 4px; }
+  aside::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .rule-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .rule-btn {
+    padding: 8px 6px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 0.75rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    line-height: 1.3;
+  }
+  .rule-btn:hover { border-color: var(--purple); }
+  .rule-btn.active {
+    border-color: var(--purple);
+    background: #2a1a4a;
+    color: var(--accent);
+  }
+  .rule-btn .rb-icon { font-size: 1.1rem; display: block; margin-bottom: 2px; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--purple); background: #1e1a38; }
+  .btn.primary { border-color: var(--purple); background: #3d2070; color: #fff; }
+  .btn.primary:hover { background: #5a30a0; }
+  .btn.danger { border-color: #8b3a3a; }
+  .btn.danger:hover { border-color: #d05050; background: #3a1a1a; }
+  label.slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.76rem;
+    color: var(--muted);
+  }
+  label.slider-row span { color: var(--text); }
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--purple);
+    height: 4px;
+  }
+  .preset-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .preset-btn {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 0.72rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover { border-color: var(--purple); color: var(--text); }
+  .desc-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 0.73rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .desc-box strong { color: var(--purple-light); }
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.73rem;
+    color: var(--muted);
+  }
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    border: 1px solid #ffffff20;
+  }
+  canvas#grid {
+    flex: 1;
+    cursor: crosshair;
+    image-rendering: pixelated;
+    display: block;
+  }
+  .canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #05050e;
+    overflow: hidden;
+  }
+  .speed-label { font-size: 0.75rem; color: var(--muted); }
+  .tooltip {
+    position: fixed;
+    background: #1e1e36ee;
+    border: 1px solid var(--purple);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    color: var(--accent);
+    pointer-events: none;
+    z-index: 100;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="layout">
+  <header>
+    <h1>🔬 Cellular Automata Lab</h1>
+    <div class="rule-name" id="ruleName">Brian's Brain — 3-state self-organizing system</div>
+    <div class="stats">
+      Gen <span id="genStat">0</span> &nbsp;·&nbsp;
+      Pop <span id="popStat">0</span> &nbsp;·&nbsp;
+      <span id="playState">⏸ Paused</span>
+    </div>
+  </header>
+  <div class="main">
+    <aside>
+      <div>
+        <div class="section-label">Ruleset</div>
+        <div class="rule-btns">
+          <button class="rule-btn active" onclick="setRule('brian')" id="btn-brian">
+            <span class="rb-icon">🧠</span>Brian's Brain
+          </button>
+          <button class="rule-btn" onclick="setRule('wireworld')" id="btn-wireworld">
+            <span class="rb-icon">⚡</span>Wireworld
+          </button>
+          <button class="rule-btn" onclick="setRule('ant')" id="btn-ant">
+            <span class="rb-icon">🐜</span>Langton's Ant
+          </button>
+          <button class="rule-btn" onclick="setRule('seeds')" id="btn-seeds">
+            <span class="rb-icon">🌱</span>Seeds
+          </button>
+          <button class="rule-btn" onclick="setRule('daynight')" id="btn-daynight">
+            <span class="rb-icon">🌙</span>Day & Night
+          </button>
+          <button class="rule-btn" onclick="setRule('life')" id="btn-life">
+            <span class="rb-icon">♾️</span>Game of Life
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Controls</div>
+        <div class="controls">
+          <button class="btn primary" id="playBtn" onclick="togglePlay()">▶ Play</button>
+          <button class="btn" onclick="step()">⏭ Step</button>
+          <button class="btn" onclick="randomSeed()">🎲 Random</button>
+          <button class="btn danger" onclick="clearGrid()">✕ Clear</button>
+        </div>
+      </div>
+
+      <div>
+        <label class="slider-row">
+          Speed <span id="speedVal">12 gen/s</span>
+          <input type="range" id="speedSlider" min="1" max="60" value="12" oninput="updateSpeed()">
+        </label>
+        <label class="slider-row" style="margin-top:8px">
+          Grid <span id="sizeVal">150×100</span>
+          <input type="range" id="sizeSlider" min="1" max="4" value="2" step="1" oninput="updateGridSize()">
+        </label>
+      </div>
+
+      <div>
+        <div class="section-label">Presets</div>
+        <div class="preset-btns" id="presetBtns"></div>
+      </div>
+
+      <div>
+        <div class="section-label">States / Colors</div>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="desc-box" id="descBox">Loading...</div>
+    </aside>
+    <div class="canvas-wrap">
+      <canvas id="grid"></canvas>
+    </div>
+  </div>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ─── Stars background ───────────────────────────────────────────────────────
+(function() {
+  const c = document.getElementById('stars');
+  const ctx = c.getContext('2d');
+  let stars = [];
+  function resize() {
+    c.width = window.innerWidth; c.height = window.innerHeight;
+    stars = Array.from({length: 180}, () => ({
+      x: Math.random() * c.width, y: Math.random() * c.height,
+      r: Math.random() * 1.2 + 0.3, a: Math.random(), da: (Math.random() - 0.5) * 0.01
+    }));
+  }
+  function draw() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    stars.forEach(s => {
+      s.a = Math.max(0.1, Math.min(1, s.a + s.da));
+      if (s.a <= 0.1 || s.a >= 1) s.da *= -1;
+      ctx.globalAlpha = s.a * 0.5;
+      ctx.fillStyle = '#c0a0ff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(draw);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  draw();
+})();
+
+// ─── CA Engine ──────────────────────────────────────────────────────────────
+const canvas = document.getElementById('grid');
+const ctx = canvas.getContext('2d');
+const GRID_SIZES = [{W:100,H:66,label:'100×66 (Fast)'},{W:150,H:100,label:'150×100'},{W:200,H:133,label:'200×133'},{W:300,H:200,label:'300×200 (Detail)'}];
+let W = 150, H = 100;
+let grid, next;
+let running = false;
+let generation = 0;
+let population = 0;
+let speed = 12;
+let rafId = null;
+let lastTime = 0;
+let currentRule = 'brian';
+let paintState = null;
+let antDir = 0, antX = 0, antY = 0; // for Langton's Ant
+let antCount = 1;
+let ants = [];
+let cellW, cellH;
+
+// Rule definitions
+const RULES = {
+  brian: {
+    name: "Brian's Brain",
+    desc: "<strong>Brian's Brain</strong> — 3-state CA: Off → On → Dying → Off. A dead cell comes alive if exactly 2 live neighbors. Creates self-perpetuating 'bullets' and complex gliders.",
+    states: 3,
+    colors: ['#0a0a12','#e8d0ff','#6040a0'],
+    labels: ['Off','Firing (On)','Dying'],
+    step: stepBrian,
+    presets: [
+      { name: '💥 Random Dense', fn: () => randomFill(0.18) },
+      { name: '🔫 Gun Pattern', fn: brianGun },
+      { name: '✨ Sparse Seed', fn: () => randomFill(0.04) },
+    ]
+  },
+  wireworld: {
+    name: "Wireworld",
+    desc: "<strong>Wireworld</strong> — 4-state: Empty, Conductor, Electron Head, Electron Tail. Electrons flow through copper wires. Can simulate logic gates, diodes, and even simple computers.",
+    states: 4,
+    colors: ['#05050e','#b87333','#60c0ff','#ff5020'],
+    labels: ['Empty','Conductor','Electron Head','Electron Tail'],
+    step: stepWireworld,
+    presets: [
+      { name: '⚡ Diode', fn: wireworldDiode },
+      { name: '🔁 Loop Oscillator', fn: wireworldLoop },
+      { name: '📡 Signal Fan-Out', fn: wireworldFanOut },
+    ]
+  },
+  ant: {
+    name: "Langton's Ant",
+    desc: "<strong>Langton's Ant</strong> — An ant walks on a grid. On white: turn right, flip cell, move. On black: turn left, flip cell, move. Pure chaos → then a 'highway' emerges around step 10,000.",
+    states: 2,
+    colors: ['#0a0a12','#d0c0e8'],
+    labels: ['White (off)','Black (on)'],
+    step: stepAnt,
+    presets: [
+      { name: '🐜 1 Ant (center)', fn: antCenter },
+      { name: '🐜🐜 2 Ants', fn: antTwo },
+      { name: '🐜🐜🐜 3 Ants', fn: antThree },
+    ]
+  },
+  seeds: {
+    name: "Seeds",
+    desc: "<strong>Seeds</strong> — 2-state. Dead cells with exactly 2 live neighbors are born. All live cells die. Creates explosive, ephemeral, self-replicating patterns. Never stabilizes.",
+    states: 2,
+    colors: ['#0a0a12','#f0d080'],
+    labels: ['Dead','Alive'],
+    step: stepSeeds,
+    presets: [
+      { name: '🌱 Single Cell', fn: () => singleCenter() },
+      { name: '💣 Cluster', fn: () => randomFill(0.05) },
+      { name: '⬛ 3x3 Block', fn: seedsBlock },
+    ]
+  },
+  daynight: {
+    name: "Day & Night",
+    desc: "<strong>Day & Night</strong> — Symmetric B3678/S3678 rule. Both 0s and 1s are 'alive' states in different ways — stable islands coexist with Day regions. Creates beautiful symmetric structures.",
+    states: 2,
+    colors: ['#0a0a12','#80c8ff'],
+    labels: ['Night','Day'],
+    step: stepDayNight,
+    presets: [
+      { name: '🌊 Random', fn: () => randomFill(0.45) },
+      { name: '🔵 Dense Center', fn: denseCenter },
+      { name: '🌓 Half & Half', fn: halfHalf },
+    ]
+  },
+  life: {
+    name: "Game of Life",
+    desc: "<strong>Conway's Game of Life</strong> — B3/S23. Born with 3 neighbors, survives with 2-3. The classic. Every other CA stands on its shoulders.",
+    states: 2,
+    colors: ['#0a0a12','#c8a0ff'],
+    labels: ['Dead','Alive'],
+    step: stepLife,
+    presets: [
+      { name: '💥 R-Pentomino', fn: lifeRPentomino },
+      { name: '🔫 Glider Gun', fn: lifeGliderGun },
+      { name: '🎲 Random', fn: () => randomFill(0.3) },
+    ]
+  }
+};
+
+function idx(x, y) { return y * W + x; }
+function get(g, x, y) {
+  x = (x + W) % W; y = (y + H) % H;
+  return g[idx(x, y)];
+}
+function set(g, x, y, v) {
+  x = (x + W) % W; y = (y + H) % H;
+  g[idx(x, y)] = v;
+}
+
+// Brian's Brain
+function stepBrian() {
+  const n = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const s = get(grid, x, y);
+      if (s === 1) { n[idx(x, y)] = 2; continue; }
+      if (s === 2) { n[idx(x, y)] = 0; continue; }
+      // s === 0: count live (state 1) neighbors
+      let live = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (dx || dy) live += get(grid, x+dx, y+dy) === 1 ? 1 : 0;
+      n[idx(x, y)] = live === 2 ? 1 : 0;
+    }
+  }
+  return n;
+}
+
+// Wireworld
+function stepWireworld() {
+  const n = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const s = get(grid, x, y);
+      if (s === 0) { n[idx(x, y)] = 0; continue; }
+      if (s === 1) { // electron head → tail
+        n[idx(x, y)] = 2; continue;
+      }
+      if (s === 2) { // tail → conductor
+        n[idx(x, y)] = 3; continue;
+      }
+      // conductor: becomes head if 1 or 2 head neighbors
+      let heads = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (dx || dy) heads += get(grid, x+dx, y+dy) === 1 ? 1 : 0;
+      n[idx(x, y)] = (heads === 1 || heads === 2) ? 1 : 3;
+    }
+  }
+  return n;
+}
+
+// Langton's Ant
+function stepAnt() {
+  const n = new Uint8Array(grid);
+  const DX = [0, 1, 0, -1]; // N E S W
+  const DY = [-1, 0, 1, 0];
+  for (let a of ants) {
+    const cell = get(n, a.x, a.y);
+    if (cell === 0) {
+      a.dir = (a.dir + 1) % 4; // turn right
+      set(n, a.x, a.y, 1);
+    } else {
+      a.dir = (a.dir + 3) % 4; // turn left
+      set(n, a.x, a.y, 0);
+    }
+    a.x = ((a.x + DX[a.dir]) + W) % W;
+    a.y = ((a.y + DY[a.dir]) + H) % H;
+  }
+  return n;
+}
+
+// Seeds
+function stepSeeds() {
+  const n = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let live = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (dx || dy) live += get(grid, x+dx, y+dy);
+      n[idx(x, y)] = live === 2 ? 1 : 0;
+    }
+  }
+  return n;
+}
+
+// Day & Night B3678/S3678
+function stepDayNight() {
+  const n = new Uint8Array(W * H);
+  const born = new Set([3,6,7,8]);
+  const survive = new Set([3,4,6,7,8]);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let live = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (dx || dy) live += get(grid, x+dx, y+dy);
+      const s = get(grid, x, y);
+      if (s === 0) n[idx(x, y)] = born.has(live) ? 1 : 0;
+      else n[idx(x, y)] = survive.has(live) ? 1 : 0;
+    }
+  }
+  return n;
+}
+
+// Game of Life B3/S23
+function stepLife() {
+  const n = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let live = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++)
+          if (dx || dy) live += get(grid, x+dx, y+dy);
+      const s = get(grid, x, y);
+      if (s === 1) n[idx(x, y)] = (live === 2 || live === 3) ? 1 : 0;
+      else n[idx(x, y)] = live === 3 ? 1 : 0;
+    }
+  }
+  return n;
+}
+
+// ─── Render ─────────────────────────────────────────────────────────────────
+function render() {
+  const rule = RULES[currentRule];
+  const colors = rule.colors.map(hex => {
+    const r = parseInt(hex.slice(1,3),16);
+    const g = parseInt(hex.slice(3,5),16);
+    const b = parseInt(hex.slice(5,7),16);
+    return [r,g,b];
+  });
+  const img = ctx.createImageData(W, H);
+  const d = img.data;
+  let pop = 0;
+  for (let i = 0; i < W * H; i++) {
+    const s = grid[i];
+    if (s > 0) pop++;
+    const c = colors[Math.min(s, colors.length - 1)];
+    const off = i * 4;
+    d[off] = c[0]; d[off+1] = c[1]; d[off+2] = c[2]; d[off+3] = 255;
+  }
+  population = pop;
+  // Draw ant positions
+  if (currentRule === 'ant') {
+    for (let a of ants) {
+      const off = (a.y * W + a.x) * 4;
+      d[off] = 255; d[off+1] = 60; d[off+2] = 60; d[off+3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  // Scale canvas is handled by CSS
+}
+
+function resizeCanvas() {
+  const wrap = canvas.parentElement;
+  const wr = wrap.clientWidth / W;
+  const hr = wrap.clientHeight / H;
+  const scale = Math.min(wr, hr);
+  canvas.width = W;
+  canvas.height = H;
+  canvas.style.width = Math.floor(W * scale) + 'px';
+  canvas.style.height = Math.floor(H * scale) + 'px';
+  cellW = scale;
+  cellH = scale;
+}
+
+// ─── Loop ───────────────────────────────────────────────────────────────────
+function loop(time) {
+  if (!running) return;
+  const interval = 1000 / speed;
+  if (time - lastTime >= interval) {
+    const r = RULES[currentRule];
+    grid = r.step();
+    generation++;
+    lastTime = time;
+    render();
+    updateStats();
+  }
+  rafId = requestAnimationFrame(loop);
+}
+
+function togglePlay() {
+  running = !running;
+  document.getElementById('playBtn').textContent = running ? '⏸ Pause' : '▶ Play';
+  document.getElementById('playState').textContent = running ? '▶ Running' : '⏸ Paused';
+  if (running) { lastTime = performance.now(); rafId = requestAnimationFrame(loop); }
+}
+
+function step() {
+  if (running) return;
+  grid = RULES[currentRule].step();
+  generation++;
+  render();
+  updateStats();
+}
+
+function updateStats() {
+  document.getElementById('genStat').textContent = generation.toLocaleString();
+  document.getElementById('popStat').textContent = population.toLocaleString();
+}
+
+// ─── Grid management ────────────────────────────────────────────────────────
+function initGrid() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  ants = [];
+  render();
+  updateStats();
+}
+
+function clearGrid() {
+  if (running) togglePlay();
+  initGrid();
+}
+
+function randomFill(density = 0.3) {
+  if (running) togglePlay();
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  const states = RULES[currentRule].states;
+  for (let i = 0; i < W * H; i++) {
+    if (Math.random() < density) grid[i] = 1;
+  }
+  // Reset ant
+  if (currentRule === 'ant') antCenter();
+  ants = [];
+  render();
+  updateStats();
+}
+
+// ─── Presets ────────────────────────────────────────────────────────────────
+function singleCenter() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  set(grid, Math.floor(W/2), Math.floor(H/2), 1);
+  render(); updateStats();
+}
+
+function seedsBlock() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  const cx = Math.floor(W/2), cy = Math.floor(H/2);
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++)
+      set(grid, cx+dx, cy+dy, 1);
+  render(); updateStats();
+}
+
+function denseCenter() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  const cx = Math.floor(W/2), cy = Math.floor(H/2);
+  const r = Math.min(W, H) / 4;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const d = Math.sqrt((x-cx)**2 + (y-cy)**2);
+      if (d < r && Math.random() < 0.8) set(grid, x, y, 1);
+    }
+  render(); updateStats();
+}
+
+function halfHalf() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (x < W/2) set(grid, x, y, 1);
+  render(); updateStats();
+}
+
+function brianGun() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  // Scatter 1s in the left quarter to act as a seed
+  for (let y = 5; y < H-5; y+=3)
+    for (let x = 5; x < W/4; x+=3)
+      if (Math.random() < 0.2) set(grid, x, y, 1);
+  render(); updateStats();
+}
+
+function wireworldDiode() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  const cy = Math.floor(H/2);
+  const sx = 10;
+  // Wire in
+  for (let x = sx; x < Math.floor(W*0.4); x++) set(grid, x, cy, 3);
+  // Diode junction (Y shape — signal goes through one way only)
+  const jx = Math.floor(W*0.4);
+  set(grid, jx, cy, 3);
+  set(grid, jx+1, cy-1, 3);
+  set(grid, jx+2, cy, 3);
+  set(grid, jx+1, cy+1, 3);
+  // Wire out
+  for (let x = jx+3; x < W-10; x++) set(grid, x, cy, 3);
+  // Seed electron
+  set(grid, sx, cy, 2);
+  set(grid, sx+1, cy, 1);
+  render(); updateStats();
+}
+
+function wireworldLoop() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  const cx = Math.floor(W/2), cy = Math.floor(H/2);
+  const r = Math.floor(Math.min(W,H) * 0.3);
+  // Draw a conductor loop
+  for (let angle = 0; angle < Math.PI*2; angle += 0.05) {
+    const x = Math.round(cx + r * Math.cos(angle));
+    const y = Math.round(cy + r * Math.sin(angle) * 0.6);
+    if (x >= 0 && x < W && y >= 0 && y < H) set(grid, x, y, 3);
+  }
+  // Inject electron at top
+  const ex = Math.round(cx + r);
+  set(grid, ex, cy, 1);
+  set(grid, ex+1, cy, 2);
+  render(); updateStats();
+}
+
+function wireworldFanOut() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  const sy = Math.floor(H/2);
+  const sx = 8;
+  // Input wire
+  for (let x = sx; x < Math.floor(W*0.35); x++) set(grid, x, sy, 3);
+  // Fan-out junction
+  const jx = Math.floor(W*0.35);
+  for (let x = jx; x <= jx+4; x++) set(grid, x, sy, 3);
+  // Top branch
+  for (let y = sy-1; y >= sy-4; y--) set(grid, jx+2, y, 3);
+  for (let x = jx+2; x < W-8; x++) set(grid, x, sy-4, 3);
+  // Bottom branch
+  for (let y = sy+1; y <= sy+4; y++) set(grid, jx+2, y, 3);
+  for (let x = jx+2; x < W-8; x++) set(grid, x, sy+4, 3);
+  // Middle branch continues
+  for (let x = jx+4; x < W-8; x++) set(grid, x, sy, 3);
+  // Seed electron
+  set(grid, sx, sy, 2);
+  set(grid, sx+1, sy, 1);
+  render(); updateStats();
+}
+
+function antCenter() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  ants = [{x: Math.floor(W/2), y: Math.floor(H/2), dir: 0}];
+  render(); updateStats();
+}
+
+function antTwo() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  ants = [
+    {x: Math.floor(W/2)-10, y: Math.floor(H/2), dir: 0},
+    {x: Math.floor(W/2)+10, y: Math.floor(H/2), dir: 2}
+  ];
+  render(); updateStats();
+}
+
+function antThree() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  ants = [
+    {x: Math.floor(W/2), y: Math.floor(H/2)-10, dir: 0},
+    {x: Math.floor(W/2)-12, y: Math.floor(H/2)+6, dir: 1},
+    {x: Math.floor(W/2)+12, y: Math.floor(H/2)+6, dir: 3}
+  ];
+  render(); updateStats();
+}
+
+function lifeRPentomino() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  const cx = Math.floor(W/2), cy = Math.floor(H/2);
+  [[0,-1],[1,-1],[-1,0],[0,0],[0,1]].forEach(([dx,dy]) => set(grid, cx+dx, cy+dy, 1));
+  render(); updateStats();
+}
+
+function lifeGliderGun() {
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  const ox = 5, oy = Math.floor(H/2) - 5;
+  const pattern = [
+    [24,0],[22,1],[24,1],[12,2],[13,2],[20,2],[21,2],[34,2],[35,2],
+    [11,3],[15,3],[20,3],[21,3],[34,3],[35,3],[0,4],[1,4],[10,4],[16,4],[20,4],[21,4],
+    [0,5],[1,5],[10,5],[14,5],[16,5],[17,5],[22,5],[24,5],
+    [10,6],[16,6],[24,6],[11,7],[15,7],[12,8],[13,8]
+  ];
+  pattern.forEach(([x,y]) => set(grid, ox+x, oy+y, 1));
+  render(); updateStats();
+}
+
+// ─── Rule switching ──────────────────────────────────────────────────────────
+function setRule(name) {
+  if (running) togglePlay();
+  currentRule = name;
+  const rule = RULES[name];
+  // Update UI
+  document.querySelectorAll('.rule-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + name).classList.add('active');
+  document.getElementById('ruleName').textContent = rule.name + ' — ' + stripHTML(rule.desc).split('—')[1]?.trim() || rule.name;
+  document.getElementById('descBox').innerHTML = rule.desc;
+  // Legend
+  const leg = document.getElementById('legend');
+  leg.innerHTML = rule.colors.map((c,i) =>
+    `<div class="legend-item"><div class="legend-swatch" style="background:${c}"></div>${rule.labels[i]||'State '+i}</div>`
+  ).join('');
+  // Presets
+  const pb = document.getElementById('presetBtns');
+  pb.innerHTML = rule.presets.map((p,i) =>
+    `<button class="preset-btn" onclick="runPreset(${i})">${p.name}</button>`
+  ).join('');
+  // Reset grid
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  ants = [];
+  // Auto-run first preset
+  rule.presets[0].fn();
+  render(); updateStats();
+}
+
+function runPreset(i) {
+  if (running) togglePlay();
+  RULES[currentRule].presets[i].fn();
+}
+
+function stripHTML(s) { return s.replace(/<[^>]+>/g,''); }
+
+// ─── Interaction ─────────────────────────────────────────────────────────────
+function updateSpeed() {
+  speed = parseInt(document.getElementById('speedSlider').value);
+  document.getElementById('speedVal').textContent = speed + ' gen/s';
+}
+
+function updateGridSize() {
+  if (running) togglePlay();
+  const idx2 = parseInt(document.getElementById('sizeSlider').value) - 1;
+  const sz = GRID_SIZES[idx2];
+  W = sz.W; H = sz.H;
+  document.getElementById('sizeVal').textContent = sz.label;
+  resizeCanvas();
+  grid = new Uint8Array(W * H);
+  generation = 0;
+  ants = [];
+  // Re-run preset 0
+  RULES[currentRule].presets[0].fn();
+}
+
+let painting = false;
+let paintValue = 1;
+
+canvas.addEventListener('mousedown', e => {
+  painting = true;
+  const {gx, gy} = canvasCoords(e);
+  if (e.button === 2) {
+    paintValue = 0;
+  } else {
+    const cur = get(grid, gx, gy);
+    paintValue = cur === 0 ? 1 : (currentRule === 'wireworld' ? (cur + 1) % 4 : 0);
+  }
+  set(grid, gx, gy, paintValue);
+  render(); updateStats();
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!painting) return;
+  const {gx, gy} = canvasCoords(e);
+  set(grid, gx, gy, paintValue);
+  render(); updateStats();
+});
+
+canvas.addEventListener('mouseup', () => { painting = false; });
+canvas.addEventListener('mouseleave', () => { painting = false; });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+function canvasCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  return {
+    gx: Math.floor((e.clientX - rect.left) * scaleX),
+    gy: Math.floor((e.clientY - rect.top) * scaleY)
+  };
+}
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const {gx, gy} = canvasCoordsTouch(t);
+  paintValue = get(grid, gx, gy) === 0 ? 1 : 0;
+  painting = true;
+  set(grid, gx, gy, paintValue);
+  render();
+}, {passive: false});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!painting) return;
+  const t = e.touches[0];
+  const {gx, gy} = canvasCoordsTouch(t);
+  set(grid, gx, gy, paintValue);
+  render();
+}, {passive: false});
+
+canvas.addEventListener('touchend', () => { painting = false; });
+
+function canvasCoordsTouch(t) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  return {
+    gx: Math.floor((t.clientX - rect.left) * scaleX),
+    gy: Math.floor((t.clientY - rect.top) * scaleY)
+  };
+}
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'ArrowRight') { if (!running) step(); }
+  if (e.code === 'KeyC') clearGrid();
+  if (e.code === 'KeyR') randomSeed();
+});
+
+function randomSeed() {
+  if (running) togglePlay();
+  RULES[currentRule].presets[Math.floor(Math.random() * RULES[currentRule].presets.length)].fn();
+}
+
+// ─── Init ───────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => { resizeCanvas(); render(); });
+
+resizeCanvas();
+setRule('brian');
+</script>
+</body>
+</html>
