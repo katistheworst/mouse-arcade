@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🫧 Bubble Wrap</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a0a2e;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Stars */
+  #starfield {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Header */
+  #header {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 10px 16px 6px;
+    color: #c9b0ff;
+  }
+  #header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.05em; opacity: 0.9; }
+  #counter {
+    font-size: 0.85rem;
+    color: #9b7ff0;
+    margin-top: 2px;
+  }
+  #counter span { color: #e0c0ff; font-weight: 700; }
+
+  /* Controls */
+  #controls {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    padding: 6px 12px;
+    align-items: center;
+  }
+  .btn {
+    background: rgba(155, 100, 255, 0.2);
+    border: 1px solid rgba(155, 100, 255, 0.4);
+    color: #c9b0ff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+  }
+  .btn:hover { background: rgba(155, 100, 255, 0.4); transform: scale(1.04); }
+  .btn:active { transform: scale(0.97); }
+  .btn.pop-all {
+    background: rgba(255, 100, 160, 0.2);
+    border-color: rgba(255, 100, 160, 0.5);
+    color: #ffb0d0;
+  }
+  .btn.pop-all:hover { background: rgba(255, 100, 160, 0.4); }
+
+  /* Mode toggle */
+  #mode-label {
+    color: #9b7ff0;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #mode-toggle {
+    width: 36px; height: 18px;
+    background: #2d1060;
+    border: 1px solid #6040b0;
+    border-radius: 9px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  #mode-toggle.on { background: #7040c0; }
+  #mode-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    background: #c9b0ff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  #mode-toggle.on::after { transform: translateX(18px); }
+
+  /* Wrap container */
+  #wrap-container {
+    position: relative;
+    z-index: 5;
+    flex: 1;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+  }
+
+  #wrap-canvas {
+    display: block;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  /* New sheet overlay */
+  #new-sheet-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 5, 40, 0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+  #new-sheet-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+  #overlay-title {
+    font-size: 3rem;
+    margin-bottom: 12px;
+  }
+  #overlay-text {
+    color: #c9b0ff;
+    font-size: 1.2rem;
+    margin-bottom: 6px;
+  }
+  #overlay-count {
+    color: #9b7ff0;
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+  }
+  #overlay-btn {
+    background: linear-gradient(135deg, #7040c0, #b04090);
+    border: none;
+    color: white;
+    padding: 12px 32px;
+    border-radius: 30px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: transform 0.15s;
+  }
+  #overlay-btn:hover { transform: scale(1.05); }
+
+  /* Pop particles */
+  .pop-particle {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 200;
+    animation: pop-fly 0.5s ease-out forwards;
+  }
+  @keyframes pop-fly {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0) translate(var(--dx), var(--dy)); }
+  }
+
+  /* Combo flash */
+  #combo-flash {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    font-weight: 900;
+    color: #ffb0d0;
+    text-shadow: 0 0 20px #ff60a0;
+    pointer-events: none;
+    z-index: 300;
+    opacity: 0;
+    transition: none;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div id="header">
+  <h1>🫧 BUBBLE WRAP</h1>
+  <div id="counter">Popped: <span id="pop-count">0</span> / <span id="total-count">0</span> &nbsp;·&nbsp; All time: <span id="all-time">0</span></div>
+</div>
+
+<div id="controls">
+  <button class="btn pop-all" id="pop-all-btn">💥 POP ALL</button>
+  <button class="btn" id="new-btn">🆕 New Sheet</button>
+  <div id="mode-label">
+    <span>Hold mode</span>
+    <div id="mode-toggle" title="Toggle hold-to-pop mode"></div>
+  </div>
+</div>
+
+<div id="wrap-container">
+  <canvas id="wrap-canvas"></canvas>
+</div>
+
+<div id="new-sheet-overlay">
+  <div id="overlay-title">🎉</div>
+  <div id="overlay-text">You popped every single bubble!</div>
+  <div id="overlay-count"></div>
+  <button id="overlay-btn">Fresh Sheet Please 🫧</button>
+</div>
+
+<div id="combo-flash"></div>
+
+<script>
+// ── Stars ──────────────────────────────────────────────────
+const starCanvas = document.getElementById('starfield');
+const sc = starCanvas.getContext('2d');
+let stars = [];
+function initStars() {
+  starCanvas.width = window.innerWidth;
+  starCanvas.height = window.innerHeight;
+  stars = Array.from({length: 180}, () => ({
+    x: Math.random() * starCanvas.width,
+    y: Math.random() * starCanvas.height,
+    r: Math.random() * 1.3 + 0.2,
+    phase: Math.random() * Math.PI * 2,
+    speed: 0.3 + Math.random() * 0.7
+  }));
+}
+function drawStars(t) {
+  sc.clearRect(0, 0, starCanvas.width, starCanvas.height);
+  stars.forEach(s => {
+    const a = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * s.speed * 0.001 + s.phase));
+    sc.beginPath();
+    sc.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    sc.fillStyle = `rgba(200, 180, 255, ${a})`;
+    sc.fill();
+  });
+}
+
+// ── Audio ──────────────────────────────────────────────────
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function popSound(index, total) {
+  ensureAudio();
+  const t = audioCtx.currentTime;
+  // Noise burst through bandpass — the actual bubble pop
+  const bufLen = audioCtx.sampleRate * 0.08;
+  const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 2);
+  }
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+
+  // Bandpass filter — pitch varies slightly per bubble
+  const bpf = audioCtx.createBiquadFilter();
+  bpf.type = 'bandpass';
+  const pitchVariance = 600 + (index / total) * 400 + (Math.random() - 0.5) * 300;
+  bpf.frequency.value = pitchVariance;
+  bpf.Q.value = 1.5 + Math.random() * 1.5;
+
+  // Second resonance for that crispy bubble character
+  const bpf2 = audioCtx.createBiquadFilter();
+  bpf2.type = 'bandpass';
+  bpf2.frequency.value = pitchVariance * 1.8;
+  bpf2.Q.value = 3;
+
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.4, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+  src.connect(bpf);
+  bpf.connect(bpf2);
+  bpf2.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start(t);
+  src.stop(t + 0.1);
+}
+
+function popAllSound() {
+  ensureAudio();
+  // Quick rapid pops
+  for (let i = 0; i < 20; i++) {
+    setTimeout(() => popSound(i * 50, 1000), i * 18);
+  }
+}
+
+// ── Bubble Wrap ────────────────────────────────────────────
+const wrapCanvas = document.getElementById('wrap-canvas');
+const wc = wrapCanvas.getContext('2d');
+
+const BUBBLE_R = 22; // base radius of each bubble
+const BUBBLE_PAD = 4;
+const CELL = (BUBBLE_R + BUBBLE_PAD) * 2;
+
+let cols, rows, bubbles;
+let popCount = 0;
+let allTimePops = parseInt(localStorage.getItem('bw_all_time') || '0');
+let sheetNumber = parseInt(localStorage.getItem('bw_sheets') || '1');
+let holdMode = false;
+let isHolding = false;
+let holdInterval = null;
+let rapidPopQueue = [];
+let comboTimer = null;
+let comboCount = 0;
+
+const popCountEl = document.getElementById('pop-count');
+const totalCountEl = document.getElementById('total-count');
+const allTimeEl = document.getElementById('all-time');
+allTimeEl.textContent = allTimePops.toLocaleString();
+
+function initWrap() {
+  const container = document.getElementById('wrap-container');
+  const cw = container.clientWidth - 8;
+  const ch = container.clientHeight - 8;
+
+  cols = Math.floor(cw / CELL);
+  rows = Math.floor(ch / CELL);
+  cols = Math.max(cols, 4);
+  rows = Math.max(rows, 4);
+
+  wrapCanvas.width = cols * CELL;
+  wrapCanvas.height = rows * CELL;
+
+  // Create bubble data
+  bubbles = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cx = c * CELL + CELL / 2;
+      const cy = r * CELL + CELL / 2;
+      // Slight irregularity
+      const jx = (Math.random() - 0.5) * 3;
+      const jy = (Math.random() - 0.5) * 3;
+      const radius = BUBBLE_R + (Math.random() - 0.5) * 3;
+      bubbles.push({
+        cx: cx + jx,
+        cy: cy + jy,
+        r: radius,
+        popped: false,
+        popProgress: 0, // 0-1 animation
+        row: r, col: c,
+        index: r * cols + c,
+        // Visual variation
+        hue: 200 + Math.random() * 60,
+        sat: 15 + Math.random() * 20,
+        hightlightAngle: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
+  popCount = 0;
+  updateCounter();
+  drawWrap();
+}
+
+function drawBubble(b, isHovered) {
+  if (b.popped) {
+    // Draw deflated bubble (flat ring)
+    const alpha = 1 - b.popProgress;
+    if (alpha <= 0) return;
+
+    wc.save();
+    wc.globalAlpha = alpha * 0.3;
+    wc.beginPath();
+    wc.arc(b.cx, b.cy, b.r * (0.6 + b.popProgress * 0.4), 0, Math.PI * 2);
+    wc.strokeStyle = 'rgba(180, 140, 255, 0.4)';
+    wc.lineWidth = 1;
+    wc.stroke();
+    wc.restore();
+    return;
+  }
+
+  const r = b.r;
+
+  // Outer body — translucent bubble
+  wc.save();
+
+  // Base fill
+  const grad = wc.createRadialGradient(b.cx - r * 0.2, b.cy - r * 0.2, r * 0.1, b.cx, b.cy, r);
+  grad.addColorStop(0, `hsla(${b.hue}, ${b.sat}%, 90%, 0.45)`);
+  grad.addColorStop(0.6, `hsla(${b.hue}, ${b.sat}%, 75%, 0.25)`);
+  grad.addColorStop(1, `hsla(${b.hue}, ${b.sat + 10}%, 60%, 0.35)`);
+
+  wc.beginPath();
+  wc.arc(b.cx, b.cy, r, 0, Math.PI * 2);
+  wc.fillStyle = grad;
+  wc.fill();
+
+  // Rim
+  wc.beginPath();
+  wc.arc(b.cx, b.cy, r, 0, Math.PI * 2);
+  wc.strokeStyle = isHovered
+    ? `hsla(${b.hue}, 60%, 85%, 0.8)`
+    : `hsla(${b.hue}, 30%, 80%, 0.45)`;
+  wc.lineWidth = isHovered ? 1.5 : 1;
+  wc.stroke();
+
+  // Top-left highlight
+  const hlx = b.cx - r * 0.3;
+  const hly = b.cy - r * 0.3;
+  const hlGrad = wc.createRadialGradient(hlx, hly, 0, hlx, hly, r * 0.45);
+  hlGrad.addColorStop(0, 'rgba(255,255,255,0.55)');
+  hlGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  wc.beginPath();
+  wc.arc(hlx, hly, r * 0.45, 0, Math.PI * 2);
+  wc.fillStyle = hlGrad;
+  wc.fill();
+
+  // Bottom-right shimmer
+  const srx = b.cx + r * 0.25;
+  const sry = b.cy + r * 0.25;
+  const srGrad = wc.createRadialGradient(srx, sry, 0, srx, sry, r * 0.25);
+  srGrad.addColorStop(0, `hsla(${b.hue}, 50%, 95%, 0.2)`);
+  srGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  wc.beginPath();
+  wc.arc(srx, sry, r * 0.25, 0, Math.PI * 2);
+  wc.fillStyle = srGrad;
+  wc.fill();
+
+  if (isHovered) {
+    // Glow ring
+    wc.beginPath();
+    wc.arc(b.cx, b.cy, r + 2, 0, Math.PI * 2);
+    wc.strokeStyle = `hsla(${b.hue}, 70%, 85%, 0.4)`;
+    wc.lineWidth = 2;
+    wc.stroke();
+  }
+
+  wc.restore();
+}
+
+let hoveredBubble = null;
+
+function drawWrap() {
+  wc.clearRect(0, 0, wrapCanvas.width, wrapCanvas.height);
+
+  // Background — bubble wrap sheet color
+  const bgGrad = wc.createLinearGradient(0, 0, wrapCanvas.width, wrapCanvas.height);
+  bgGrad.addColorStop(0, 'rgba(60, 20, 100, 0.15)');
+  bgGrad.addColorStop(1, 'rgba(40, 10, 80, 0.1)');
+  wc.fillStyle = bgGrad;
+  wc.fillRect(0, 0, wrapCanvas.width, wrapCanvas.height);
+
+  // Draw all bubbles
+  bubbles.forEach((b, i) => {
+    drawBubble(b, b === hoveredBubble);
+  });
+}
+
+function getBubbleAt(x, y) {
+  // Scale from screen to canvas coords
+  const rect = wrapCanvas.getBoundingClientRect();
+  const scaleX = wrapCanvas.width / rect.width;
+  const scaleY = wrapCanvas.height / rect.height;
+  const cx = (x - rect.left) * scaleX;
+  const cy = (y - rect.top) * scaleY;
+
+  for (const b of bubbles) {
+    if (b.popped) continue;
+    const dx = cx - b.cx;
+    const dy = cy - b.cy;
+    if (dx * dx + dy * dy <= b.r * b.r) return b;
+  }
+  return null;
+}
+
+function popBubble(b) {
+  if (!b || b.popped) return;
+  b.popped = true;
+  b.popProgress = 0;
+  popCount++;
+  allTimePops++;
+  localStorage.setItem('bw_all_time', allTimePops);
+  updateCounter();
+
+  // Sound
+  popSound(b.index, bubbles.length);
+
+  // Particles
+  spawnParticles(b.cx, b.cy, b);
+
+  // Combo
+  handleCombo();
+
+  // Animate deflation
+  animateDeflate(b);
+
+  // Check win
+  if (popCount >= bubbles.length) {
+    setTimeout(showWinOverlay, 800);
+  }
+}
+
+function animateDeflate(b) {
+  const startTime = performance.now();
+  const duration = 300;
+  function step(now) {
+    b.popProgress = Math.min(1, (now - startTime) / duration);
+    if (b.popProgress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function updateCounter() {
+  popCountEl.textContent = popCount.toLocaleString();
+  totalCountEl.textContent = bubbles ? bubbles.length.toLocaleString() : '0';
+  allTimeEl.textContent = allTimePops.toLocaleString();
+}
+
+function handleCombo() {
+  comboCount++;
+  if (comboTimer) clearTimeout(comboTimer);
+  comboTimer = setTimeout(() => { comboCount = 0; }, 1500);
+
+  if (comboCount >= 5) {
+    const messages = ['POPPIN\'! 🔥', 'ON A ROLL! 💥', 'UNSTOPPABLE! 🫧', 'SO SATISFYING! ✨', 'POP MACHINE! 🎉'];
+    const msg = messages[Math.floor(Math.random() * messages.length)];
+    showComboFlash(msg);
+  }
+}
+
+const comboFlash = document.getElementById('combo-flash');
+let comboFlashTimer = null;
+function showComboFlash(msg) {
+  comboFlash.textContent = msg;
+  comboFlash.style.opacity = '1';
+  comboFlash.style.transition = 'opacity 0.1s';
+  if (comboFlashTimer) clearTimeout(comboFlashTimer);
+  comboFlashTimer = setTimeout(() => {
+    comboFlash.style.transition = 'opacity 0.6s';
+    comboFlash.style.opacity = '0';
+  }, 600);
+}
+
+function spawnParticles(cx, cy, bubble) {
+  const rect = wrapCanvas.getBoundingClientRect();
+  const scaleX = rect.width / wrapCanvas.width;
+  const scaleY = rect.height / wrapCanvas.height;
+  const screenX = rect.left + cx * scaleX;
+  const screenY = rect.top + cy * scaleY;
+
+  const count = 6 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'pop-particle';
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+    const dist = 20 + Math.random() * 30;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+    const size = 4 + Math.random() * 5;
+    const hue = bubble.hue + (Math.random() - 0.5) * 40;
+    el.style.cssText = `
+      left: ${screenX - size/2}px;
+      top: ${screenY - size/2}px;
+      width: ${size}px;
+      height: ${size}px;
+      background: hsla(${hue}, 70%, 85%, 0.9);
+      --dx: ${dx}px;
+      --dy: ${dy}px;
+    `;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 520);
+  }
+}
+
+function showWinOverlay() {
+  localStorage.setItem('bw_sheets', sheetNumber + 1);
+  document.getElementById('overlay-count').textContent =
+    `Sheet #${sheetNumber} complete · ${bubbles.length} bubbles popped · All time: ${allTimePops.toLocaleString()}`;
+  document.getElementById('new-sheet-overlay').classList.add('show');
+}
+
+function hideWinOverlay() {
+  document.getElementById('new-sheet-overlay').classList.remove('show');
+  sheetNumber++;
+  initWrap();
+}
+
+// ── Events ─────────────────────────────────────────────────
+wrapCanvas.addEventListener('mousemove', e => {
+  const b = getBubbleAt(e.clientX, e.clientY);
+  hoveredBubble = b || null;
+  if (holdMode && isHolding && b) popBubble(b);
+});
+
+wrapCanvas.addEventListener('mouseleave', () => { hoveredBubble = null; });
+
+wrapCanvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  isHolding = true;
+  const b = getBubbleAt(e.clientX, e.clientY);
+  popBubble(b);
+});
+
+wrapCanvas.addEventListener('mouseup', () => { isHolding = false; });
+
+// Touch
+wrapCanvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  isHolding = true;
+  Array.from(e.changedTouches).forEach(t => {
+    const b = getBubbleAt(t.clientX, t.clientY);
+    popBubble(b);
+  });
+}, { passive: false });
+
+wrapCanvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  Array.from(e.changedTouches).forEach(t => {
+    const b = getBubbleAt(t.clientX, t.clientY);
+    if (holdMode || true) popBubble(b); // always pop on drag
+  });
+}, { passive: false });
+
+wrapCanvas.addEventListener('touchend', () => { isHolding = false; });
+
+// Pop All
+document.getElementById('pop-all-btn').addEventListener('click', () => {
+  popAllSound();
+  const remaining = bubbles.filter(b => !b.popped);
+  let delay = 0;
+  // Randomize order for fun
+  const shuffled = remaining.sort(() => Math.random() - 0.5);
+  shuffled.forEach(b => {
+    setTimeout(() => {
+      b.popped = true;
+      b.popProgress = 0;
+      popCount++;
+      allTimePops++;
+      animateDeflate(b);
+      updateCounter();
+    }, delay);
+    delay += 8 + Math.random() * 12;
+  });
+  setTimeout(() => {
+    localStorage.setItem('bw_all_time', allTimePops);
+    if (remaining.length > 0) setTimeout(showWinOverlay, delay + 500);
+  }, delay + 100);
+});
+
+// New sheet
+document.getElementById('new-btn').addEventListener('click', () => {
+  document.getElementById('new-sheet-overlay').classList.remove('show');
+  sheetNumber++;
+  initWrap();
+});
+
+// Win overlay button
+document.getElementById('overlay-btn').addEventListener('click', hideWinOverlay);
+
+// Hold mode toggle
+const modeToggle = document.getElementById('mode-toggle');
+modeToggle.addEventListener('click', () => {
+  holdMode = !holdMode;
+  modeToggle.classList.toggle('on', holdMode);
+});
+
+// Keyboard: Space = pop all
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) {
+    e.preventDefault();
+    document.getElementById('pop-all-btn').click();
+  }
+  if (e.code === 'KeyN') document.getElementById('new-btn').click();
+});
+
+// ── Main loop ──────────────────────────────────────────────
+let lastDraw = 0;
+function loop(t) {
+  requestAnimationFrame(loop);
+  drawStars(t);
+  // Draw wrap at 60fps too
+  if (t - lastDraw > 16) {
+    drawWrap();
+    lastDraw = t;
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────
+initStars();
+initWrap();
+requestAnimationFrame(loop);
+
+window.addEventListener('resize', () => {
+  initStars();
+  initWrap();
+});
+</script>
+</body>
+</html>
