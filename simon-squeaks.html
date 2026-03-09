@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Simon Squeaks 🐭</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  body {
+    background: #08061a;
+    color: #e0d8ff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  
+  canvas#bg {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+  }
+  
+  .game-wrap {
+    position: relative; z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 20px;
+    max-width: 440px;
+    width: 100%;
+  }
+  
+  .title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #c890ff;
+    letter-spacing: 2px;
+    text-shadow: 0 0 20px rgba(180, 120, 255, 0.5);
+  }
+  .title .sub { font-size: 0.75rem; color: #7060a0; font-weight: 400; letter-spacing: 3px; display: block; margin-top: 2px; }
+  
+  .score-row {
+    display: flex;
+    gap: 40px;
+    text-align: center;
+  }
+  .score-cell .val {
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: #d0a8ff;
+    line-height: 1;
+  }
+  .score-cell .lbl {
+    font-size: 0.7rem;
+    color: #6050a0;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  
+  /* Status message */
+  .status {
+    font-size: 1rem;
+    color: #a090d0;
+    min-height: 1.4em;
+    text-align: center;
+    transition: color 0.3s;
+  }
+  .status.watching { color: #d0a0ff; }
+  .status.your-turn { color: #60ffb0; }
+  .status.wrong { color: #ff6060; }
+  .status.win { color: #ffe060; }
+  
+  /* Game board */
+  .board {
+    position: relative;
+    width: min(320px, 86vw);
+    height: min(320px, 86vw);
+  }
+  
+  .pad {
+    position: absolute;
+    width: 48%;
+    height: 48%;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: filter 0.08s, transform 0.08s;
+    border: 3px solid rgba(255,255,255,0.08);
+  }
+  .pad:active { transform: scale(0.95); }
+  
+  /* Positions */
+  .pad[data-idx="0"] { top: 0; left: 0; border-radius: 80% 20% 20% 20%; }
+  .pad[data-idx="1"] { top: 0; right: 0; border-radius: 20% 80% 20% 20%; }
+  .pad[data-idx="2"] { bottom: 0; left: 0; border-radius: 20% 20% 20% 80%; }
+  .pad[data-idx="3"] { bottom: 0; right: 0; border-radius: 20% 20% 80% 20%; }
+  
+  /* Colors — unlit */
+  .pad[data-idx="0"] { background: radial-gradient(circle at 40% 40%, #5020a0, #300a60); }
+  .pad[data-idx="1"] { background: radial-gradient(circle at 60% 40%, #c02060, #700830); }
+  .pad[data-idx="2"] { background: radial-gradient(circle at 40% 60%, #1060c0, #083060); }
+  .pad[data-idx="3"] { background: radial-gradient(circle at 60% 60%, #208050, #083020); }
+  
+  /* Colors — lit */
+  .pad[data-idx="0"].lit { background: radial-gradient(circle at 40% 40%, #b060ff, #7030e0); filter: brightness(1.5) drop-shadow(0 0 24px #b060ff); }
+  .pad[data-idx="1"].lit { background: radial-gradient(circle at 60% 40%, #ff4090, #e01060); filter: brightness(1.5) drop-shadow(0 0 24px #ff4090); }
+  .pad[data-idx="2"].lit { background: radial-gradient(circle at 40% 60%, #40a0ff, #1060e0); filter: brightness(1.5) drop-shadow(0 0 24px #40a0ff); }
+  .pad[data-idx="3"].lit { background: radial-gradient(circle at 60% 60%, #40e080, #10a040); filter: brightness(1.5) drop-shadow(0 0 24px #40e080); }
+  
+  /* Center mouse */
+  .center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px; height: 80px;
+    background: #12091f;
+    border: 3px solid #3a2060;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    z-index: 2;
+    box-shadow: 0 0 0 6px #08061a;
+    transition: box-shadow 0.2s;
+  }
+  .center.pulse { box-shadow: 0 0 0 6px #08061a, 0 0 30px rgba(180, 120, 255, 0.6); }
+  
+  /* Buttons */
+  .btn-row { display: flex; gap: 12px; }
+  .btn {
+    padding: 12px 28px;
+    border-radius: 30px;
+    border: 1px solid #4a2080;
+    background: #1a0f30;
+    color: #c080ff;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .btn:hover { background: #2a1850; border-color: #7040c0; }
+  .btn.primary {
+    background: linear-gradient(135deg, #5030a0, #3a1878);
+    border-color: #8050d0;
+    color: #e8d0ff;
+  }
+  .btn.primary:hover { background: linear-gradient(135deg, #6040b0, #4a2088); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  
+  /* Speed indicator */
+  .speed-dots {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .speed-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #2a1848;
+    border: 1px solid #4a2870;
+    transition: background 0.3s;
+  }
+  .speed-dot.on { background: #c080ff; box-shadow: 0 0 6px #c080ff; }
+  .speed-lbl { font-size: 0.75rem; color: #6050a0; letter-spacing: 1px; }
+  
+  /* Overlay */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(8, 6, 26, 0.9);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 30px;
+    text-align: center;
+    backdrop-filter: blur(6px);
+  }
+  .overlay.hidden { display: none; }
+  .overlay-emoji { font-size: 4rem; }
+  .overlay-title { font-size: 1.8rem; font-weight: 800; color: #d0a8ff; }
+  .overlay-sub { font-size: 1rem; color: #8070b0; max-width: 280px; line-height: 1.5; }
+  .overlay-score { font-size: 3rem; font-weight: 800; color: #c080ff; }
+  .overlay-hi { font-size: 0.9rem; color: #6050a0; }
+  
+  /* Particle container */
+  .particles { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+  .particle {
+    position: absolute;
+    width: 6px; height: 6px; border-radius: 50%;
+    pointer-events: none;
+    animation: pfade linear forwards;
+  }
+  @keyframes pfade {
+    0% { opacity: 1; transform: translate(0,0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
+  }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div class="particles" id="particles"></div>
+
+<div class="game-wrap">
+  <div class="title">
+    🐭 SIMON SQUEAKS
+    <span class="sub">PATTERN MEMORY GAME</span>
+  </div>
+  
+  <div class="score-row">
+    <div class="score-cell">
+      <div class="val" id="round-display">-</div>
+      <div class="lbl">Round</div>
+    </div>
+    <div class="score-cell">
+      <div class="val" id="score-display">0</div>
+      <div class="lbl">Score</div>
+    </div>
+    <div class="score-cell">
+      <div class="val" id="hi-display">0</div>
+      <div class="lbl">Best</div>
+    </div>
+  </div>
+  
+  <div class="status" id="status">Press Start to play</div>
+  
+  <div class="board" id="board">
+    <div class="pad" data-idx="0" onclick="handlePad(0)"></div>
+    <div class="pad" data-idx="1" onclick="handlePad(1)"></div>
+    <div class="pad" data-idx="2" onclick="handlePad(2)"></div>
+    <div class="pad" data-idx="3" onclick="handlePad(3)"></div>
+    <div class="center" id="center">🐭</div>
+  </div>
+  
+  <div class="speed-dots">
+    <span class="speed-lbl">SPEED</span>
+    <div class="speed-dot" id="d0"></div>
+    <div class="speed-dot" id="d1"></div>
+    <div class="speed-dot" id="d2"></div>
+    <div class="speed-dot" id="d3"></div>
+    <div class="speed-dot" id="d4"></div>
+  </div>
+  
+  <div class="btn-row">
+    <button class="btn primary" id="start-btn" onclick="startGame()">Start</button>
+    <button class="btn" id="strict-btn" onclick="toggleStrict()" title="Strict mode: one mistake ends the game">Strict: OFF</button>
+  </div>
+</div>
+
+<!-- Game over overlay -->
+<div class="overlay" id="overlay">
+  <div class="overlay-emoji" id="ov-emoji">🐭</div>
+  <div class="overlay-title" id="ov-title">Game Over!</div>
+  <div class="overlay-sub" id="ov-sub">The pattern got you.</div>
+  <div class="overlay-score" id="ov-score">0</div>
+  <div class="overlay-hi" id="ov-hi">Best: 0</div>
+  <div class="btn-row">
+    <button class="btn primary" onclick="startGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+// ─── Stars ───────────────────────────────────────────────
+const bgc = document.getElementById('bg');
+const bgx = bgc.getContext('2d');
+let stars = [];
+function resizeBg() { bgc.width = window.innerWidth; bgc.height = window.innerHeight; }
+function initStars() {
+  stars = Array.from({length: 200}, () => ({
+    x: Math.random() * bgc.width,
+    y: Math.random() * bgc.height,
+    r: Math.random() * 1.2 + 0.2,
+    a: Math.random(),
+    da: (Math.random() - 0.5) * 0.008
+  }));
+}
+function animStars() {
+  bgx.clearRect(0, 0, bgc.width, bgc.height);
+  stars.forEach(s => {
+    s.a = Math.max(0, Math.min(1, s.a + s.da));
+    if (s.a <= 0 || s.a >= 1) s.da *= -1;
+    bgx.beginPath();
+    bgx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    bgx.fillStyle = `rgba(200, 170, 255, ${s.a})`;
+    bgx.fill();
+  });
+  requestAnimationFrame(animStars);
+}
+resizeBg(); initStars(); animStars();
+window.addEventListener('resize', () => { resizeBg(); initStars(); });
+
+// ─── Audio ────────────────────────────────────────────────
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+
+const FREQS  = [880, 1100, 660, 990]; // purple, pink, blue, green
+const COLORS = ['#c080ff','#ff6090','#60b0ff','#50e090'];
+
+function playSqueak(idx, dur = 0.22) {
+  const f = FREQS[idx];
+  const osc = AC.createOscillator();
+  const gain = AC.createGain();
+  osc.connect(gain);
+  gain.connect(AC.destination);
+  
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(f * 0.8, AC.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(f * 1.3, AC.currentTime + dur * 0.4);
+  osc.frequency.exponentialRampToValueAtTime(f * 0.9, AC.currentTime + dur);
+  
+  gain.gain.setValueAtTime(0, AC.currentTime);
+  gain.gain.linearRampToValueAtTime(0.3, AC.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + dur);
+  
+  osc.start(AC.currentTime);
+  osc.stop(AC.currentTime + dur + 0.05);
+}
+
+function playError() {
+  const osc = AC.createOscillator();
+  const gain = AC.createGain();
+  osc.connect(gain);
+  gain.connect(AC.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(200, AC.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(100, AC.currentTime + 0.4);
+  gain.gain.setValueAtTime(0.2, AC.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.4);
+  osc.start(AC.currentTime);
+  osc.stop(AC.currentTime + 0.45);
+}
+
+function playWin() {
+  const notes = [880, 1100, 1320, 1760];
+  notes.forEach((f, i) => {
+    const osc = AC.createOscillator();
+    const gain = AC.createGain();
+    osc.connect(gain); gain.connect(AC.destination);
+    osc.frequency.value = f;
+    const t = AC.currentTime + i * 0.12;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.25, t + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    osc.start(t); osc.stop(t + 0.4);
+  });
+}
+
+// ─── Game State ───────────────────────────────────────────
+let sequence = [];
+let playerIdx = 0;
+let round = 0;
+let score = 0;
+let hiScore = parseInt(localStorage.getItem('simon_hi') || '0');
+let isPlaying = false;
+let isPlayerTurn = false;
+let strictMode = false;
+let showDelay = 500;
+let litTimeout = null;
+
+const pads = document.querySelectorAll('.pad');
+const statusEl = document.getElementById('status');
+const roundEl = document.getElementById('round-display');
+const scoreEl = document.getElementById('score-display');
+const hiEl = document.getElementById('hi-display');
+const centerEl = document.getElementById('center');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('start-btn');
+
+hiEl.textContent = hiScore;
+
+function updateSpeedDots() {
+  // Speed increases every 5 rounds
+  const level = Math.min(4, Math.floor((round - 1) / 5));
+  for (let i = 0; i < 5; i++) {
+    document.getElementById('d' + i).classList.toggle('on', i <= level);
+  }
+}
+
+function getDelay() {
+  if (round >= 21) return 200;
+  if (round >= 16) return 300;
+  if (round >= 11) return 380;
+  if (round >= 6)  return 450;
+  return 600;
+}
+
+function getLitDur() {
+  if (round >= 16) return 150;
+  if (round >= 11) return 200;
+  if (round >= 6)  return 280;
+  return 380;
+}
+
+function litPad(idx) {
+  AC.resume();
+  pads[idx].classList.add('lit');
+  playSqueak(idx, getLitDur() / 1000);
+  burst(pads[idx], COLORS[idx]);
+}
+
+function unlitPad(idx) {
+  pads[idx].classList.remove('lit');
+}
+
+function setStatus(msg, cls = '') {
+  statusEl.textContent = msg;
+  statusEl.className = 'status ' + cls;
+}
+
+function burst(el, color) {
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  for (let i = 0; i < 10; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (Math.PI * 2 * i) / 10;
+    const dist = 40 + Math.random() * 40;
+    p.style.cssText = `
+      left: ${cx}px; top: ${cy}px;
+      background: ${color};
+      --dx: ${Math.cos(angle) * dist}px;
+      --dy: ${Math.sin(angle) * dist}px;
+      animation-duration: ${0.4 + Math.random() * 0.3}s;
+      width: ${3 + Math.random() * 4}px;
+      height: ${3 + Math.random() * 4}px;
+    `;
+    document.getElementById('particles').appendChild(p);
+    setTimeout(() => p.remove(), 800);
+  }
+}
+
+function showSequence(cb) {
+  isPlayerTurn = false;
+  setStatus('Watch the pattern...', 'watching');
+  startBtn.disabled = true;
+  
+  let i = 0;
+  const delay = getDelay();
+  const lit = getLitDur();
+  
+  function next() {
+    if (i >= sequence.length) {
+      setTimeout(() => {
+        isPlayerTurn = true;
+        playerIdx = 0;
+        setStatus(`Your turn! (${sequence.length} steps)`, 'your-turn');
+        if (cb) cb();
+      }, delay);
+      return;
+    }
+    const idx = sequence[i];
+    setTimeout(() => {
+      litPad(idx);
+      setTimeout(() => {
+        unlitPad(idx);
+        i++;
+        next();
+      }, lit);
+    }, i === 0 ? delay * 0.5 : delay);
+  }
+  next();
+}
+
+function handlePad(idx) {
+  if (!isPlaying || !isPlayerTurn) return;
+  AC.resume();
+  
+  litPad(idx);
+  setTimeout(() => unlitPad(idx), 200);
+  
+  if (idx === sequence[playerIdx]) {
+    playerIdx++;
+    if (playerIdx === sequence.length) {
+      // Correct full sequence!
+      score += round;
+      scoreEl.textContent = score;
+      isPlayerTurn = false;
+      
+      if (round === 20) {
+        // Beat the game!
+        setTimeout(() => {
+          playWin();
+          setStatus('🎉 YOU WIN! 20 rounds!', 'win');
+          endGame(true);
+        }, 400);
+      } else {
+        setTimeout(() => {
+          round++;
+          roundEl.textContent = round;
+          updateSpeedDots();
+          sequence.push(Math.floor(Math.random() * 4));
+          setStatus('Nice! Next round...', 'watching');
+          centerEl.classList.add('pulse');
+          setTimeout(() => { centerEl.classList.remove('pulse'); showSequence(); }, 700);
+        }, 600);
+      }
+    }
+  } else {
+    // Wrong!
+    isPlayerTurn = false;
+    playError();
+    setStatus('❌ Wrong!', 'wrong');
+    
+    // Flash all pads red briefly
+    pads.forEach(p => p.style.filter = 'brightness(0.3) sepia(1) saturate(5) hue-rotate(320deg)');
+    setTimeout(() => { pads.forEach(p => p.style.filter = ''); }, 500);
+    
+    if (strictMode) {
+      setTimeout(() => endGame(false), 700);
+    } else {
+      // Replay current sequence
+      setTimeout(() => {
+        setStatus('Try again!', 'your-turn');
+        showSequence();
+      }, 1000);
+    }
+  }
+}
+
+function startGame() {
+  AC.resume();
+  overlay.classList.add('hidden');
+  sequence = [Math.floor(Math.random() * 4), Math.floor(Math.random() * 4)];
+  round = 1;
+  score = 0;
+  playerIdx = 0;
+  isPlaying = true;
+  
+  roundEl.textContent = round;
+  scoreEl.textContent = score;
+  startBtn.textContent = 'Restart';
+  startBtn.disabled = false;
+  
+  updateSpeedDots();
+  
+  setTimeout(() => showSequence(), 600);
+}
+
+function endGame(won) {
+  isPlaying = false;
+  isPlayerTurn = false;
+  
+  if (score > hiScore) {
+    hiScore = score;
+    localStorage.setItem('simon_hi', hiScore);
+    hiEl.textContent = hiScore;
+  }
+  
+  setTimeout(() => {
+    document.getElementById('ov-emoji').textContent = won ? '🏆' : '🐭';
+    document.getElementById('ov-title').textContent = won ? 'You Beat It!' : 'Game Over!';
+    document.getElementById('ov-sub').textContent = won
+      ? 'All 20 rounds complete. You are the Squeak Master.'
+      : (strictMode ? 'Strict mode. No mercy.' : `You made it to round ${round}.`);
+    document.getElementById('ov-score').textContent = score;
+    document.getElementById('ov-hi').textContent = `Best: ${hiScore}`;
+    overlay.classList.remove('hidden');
+    if (won) playWin();
+  }, 800);
+  
+  startBtn.disabled = false;
+  startBtn.textContent = 'Start';
+}
+
+function toggleStrict() {
+  strictMode = !strictMode;
+  document.getElementById('strict-btn').textContent = 'Strict: ' + (strictMode ? 'ON' : 'OFF');
+  document.getElementById('strict-btn').style.borderColor = strictMode ? '#ff4060' : '';
+  document.getElementById('strict-btn').style.color = strictMode ? '#ff8090' : '';
+}
+
+// Keyboard support: keys 1-4 for pads
+document.addEventListener('keydown', e => {
+  const map = {'1':0, '2':1, '3':2, '4':3, 'q':0, 'w':1, 'a':2, 's':3};
+  if (map[e.key] !== undefined) handlePad(map[e.key]);
+  if (e.key === ' ' || e.key === 'Enter') startGame();
+});
+</script>
+</body>
+</html>
