@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧠 Influence Academy</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0a0a0f;--surface:#14141f;--card:#1a1a2e;--card-hover:#222240;
+--border:#2a2a45;--text:#e8e8f0;--text-dim:#8888aa;--text-muted:#555570;
+--accent:#7c3aed;--accent-glow:#7c3aed44;--accent-light:#a78bfa;
+--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--info:#3b82f6;
+--gold:#fbbf24;--gradient:linear-gradient(135deg,#7c3aed,#3b82f6);
+}
+html{scroll-behavior:smooth}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+a{color:var(--accent-light);text-decoration:none}
+::selection{background:var(--accent);color:#fff}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.app{max-width:800px;margin:0 auto;padding:0 16px 100px}
+
+/* Header */
+.header{text-align:center;padding:40px 0 20px;position:relative}
+.header h1{font-size:2.2em;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;letter-spacing:-0.5px}
+.header .tagline{color:var(--text-dim);font-size:0.95em;font-style:italic}
+.streak-badge{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 14px;margin-top:12px;font-size:0.85em;color:var(--gold)}
+.streak-badge.active{border-color:var(--gold);box-shadow:0 0 12px #fbbf2433}
+
+/* Nav */
+.nav{display:flex;gap:6px;padding:12px 0;overflow-x:auto;position:sticky;top:0;background:var(--bg);z-index:100;border-bottom:1px solid var(--border);margin-bottom:20px;-webkit-overflow-scrolling:touch}
+.nav-btn{flex-shrink:0;padding:10px 18px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;font-size:0.85em;transition:all .2s;white-space:nowrap}
+.nav-btn:hover{border-color:var(--accent);color:var(--text)}
+.nav-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 0 20px var(--accent-glow)}
+
+/* Views */
+.view{display:none;animation:fadeIn .3s ease}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes confetti{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(-100px) rotate(720deg);opacity:0}}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:14px;transition:all .25s;cursor:pointer;position:relative;overflow:hidden}
+.card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 30px #0005}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gradient);opacity:0;transition:opacity .25s}
+.card:hover::before{opacity:1}
+.card-cat{font-size:0.75em;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent-light);margin-bottom:8px;font-weight:600}
+.card-title{font-size:1.15em;font-weight:600;margin-bottom:6px}
+.card-desc{font-size:0.88em;color:var(--text-dim);line-height:1.5}
+.card-meta{display:flex;gap:12px;margin-top:12px;font-size:0.78em;color:var(--text-muted)}
+.card-meta span{display:flex;align-items:center;gap:4px}
+.card-badge{position:absolute;top:16px;right:16px;padding:4px 10px;border-radius:8px;font-size:0.72em;font-weight:600}
+.badge-complete{background:#10b98122;color:var(--success);border:1px solid #10b98144}
+.badge-review{background:#f59e0b22;color:var(--warning);border:1px solid #f59e0b44}
+.badge-new{background:#3b82f622;color:var(--info);border:1px solid #3b82f644}
+
+/* Category filter */
+.cat-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.cat-pill{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;font-size:0.8em;transition:all .2s}
+.cat-pill:hover,.cat-pill.active{border-color:var(--accent);color:var(--accent-light);background:var(--accent)11}
+
+/* Lesson View */
+.lesson-view{animation:slideUp .4s ease}
+.lesson-back{display:inline-flex;align-items:center;gap:6px;color:var(--text-dim);cursor:pointer;margin-bottom:20px;font-size:0.9em;padding:8px 0;transition:color .2s}
+.lesson-back:hover{color:var(--accent-light)}
+.lesson-header{margin-bottom:24px}
+.lesson-header h2{font-size:1.6em;margin-bottom:8px;line-height:1.3}
+.lesson-header .cat{font-size:0.8em;color:var(--accent-light);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+.lesson-content{line-height:1.8;font-size:0.95em;color:var(--text)}
+.lesson-content h3{color:var(--accent-light);margin:24px 0 12px;font-size:1.1em}
+.lesson-content p{margin-bottom:14px}
+.lesson-content strong{color:#fff}
+.lesson-content .example{background:var(--surface);border-left:3px solid var(--accent);padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0;font-size:0.92em}
+.lesson-content .example .label{color:var(--accent-light);font-weight:600;font-size:0.8em;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.lesson-content .tip{background:#10b98111;border-left:3px solid var(--success);padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0}
+.lesson-content .tip .label{color:var(--success);font-weight:600;font-size:0.8em;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.lesson-content ul{margin:10px 0 14px 20px}
+.lesson-content li{margin-bottom:8px;color:var(--text-dim)}
+.lesson-content li strong{color:var(--text)}
+.lesson-actions{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
+.btn{padding:12px 24px;border-radius:12px;border:none;cursor:pointer;font-size:0.9em;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:8px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#6d28d9;transform:translateY(-1px);box-shadow:0 4px 15px var(--accent-glow)}
+.btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent-light)}
+.btn-success{background:var(--success);color:#fff}
+.btn-sm{padding:8px 16px;font-size:0.82em}
+
+/* Quiz */
+.quiz-container{margin-top:30px;padding-top:30px;border-top:1px solid var(--border)}
+.quiz-progress{display:flex;gap:6px;margin-bottom:20px}
+.quiz-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:all .3s}
+.quiz-dot.current{background:var(--accent);box-shadow:0 0 10px var(--accent-glow)}
+.quiz-dot.correct{background:var(--success)}
+.quiz-dot.wrong{background:var(--danger)}
+.quiz-question{font-size:1.1em;font-weight:600;margin-bottom:20px;line-height:1.5}
+.quiz-option{display:block;width:100%;text-align:left;padding:14px 18px;margin-bottom:10px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:0.92em;transition:all .2s;line-height:1.4}
+.quiz-option:hover:not(.disabled){border-color:var(--accent);background:var(--card)}
+.quiz-option.selected{border-color:var(--accent);background:var(--accent)22}
+.quiz-option.correct{border-color:var(--success);background:#10b98122;color:var(--success)}
+.quiz-option.wrong{border-color:var(--danger);background:#ef444422;color:var(--danger)}
+.quiz-option.disabled{cursor:default;opacity:0.7}
+.quiz-option.disabled.correct{opacity:1}
+.quiz-explanation{background:var(--surface);border-radius:12px;padding:16px;margin-top:16px;font-size:0.9em;line-height:1.6;border-left:3px solid var(--accent);animation:fadeIn .3s}
+.quiz-result{text-align:center;padding:30px 20px;animation:fadeIn .4s}
+.quiz-result .score{font-size:3em;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.quiz-result .label{color:var(--text-dim);margin-top:8px}
+
+/* Scenario */
+.scenario-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:20px}
+.scenario-situation{font-size:1.05em;line-height:1.6;margin-bottom:8px}
+.scenario-client{background:var(--surface);border-radius:12px;padding:16px;margin:16px 0;font-style:italic;border-left:3px solid var(--warning);font-size:1em}
+.scenario-client::before{content:'💬 Client: ';font-style:normal;font-weight:600;color:var(--warning)}
+.scenario-option{display:block;width:100%;text-align:left;padding:14px 18px;margin-bottom:10px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:0.9em;transition:all .2s;line-height:1.5}
+.scenario-option:hover:not(.revealed){border-color:var(--accent)}
+.scenario-option.best{border-color:var(--success);background:#10b98115}
+.scenario-option.ok{border-color:var(--warning);background:#f59e0b11}
+.scenario-option.bad{border-color:var(--danger);background:#ef444411}
+.scenario-feedback{margin-top:6px;font-size:0.82em;padding:8px 12px;border-radius:8px;line-height:1.5}
+
+/* Dashboard */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:30px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center}
+.stat-card .num{font-size:2em;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-card .label{font-size:0.8em;color:var(--text-dim);margin-top:4px}
+.progress-bar{height:8px;background:var(--surface);border-radius:4px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;background:var(--gradient);border-radius:4px;transition:width .6s ease}
+.history-item{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:10px;background:var(--surface);margin-bottom:8px;font-size:0.88em}
+.history-score{font-weight:600}
+.history-score.good{color:var(--success)}
+.history-score.ok{color:var(--warning)}
+.history-score.bad{color:var(--danger)}
+
+/* Spaced rep banner */
+.review-banner{background:linear-gradient(135deg,#f59e0b22,#f59e0b05);border:1px solid #f59e0b44;border-radius:14px;padding:18px;margin-bottom:20px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .2s}
+.review-banner:hover{border-color:var(--warning);transform:translateY(-1px)}
+.review-banner .icon{font-size:1.8em}
+.review-banner .info h3{font-size:0.95em;color:var(--warning);margin-bottom:2px}
+.review-banner .info p{font-size:0.82em;color:var(--text-dim)}
+
+/* Daily lesson */
+.daily-hero{background:var(--gradient);border-radius:18px;padding:28px;margin-bottom:24px;position:relative;overflow:hidden;cursor:pointer;transition:transform .2s}
+.daily-hero:hover{transform:translateY(-2px)}
+.daily-hero::after{content:'';position:absolute;top:-50%;right:-50%;width:100%;height:200%;background:radial-gradient(circle,#fff1 0%,transparent 60%);pointer-events:none}
+.daily-hero .label{font-size:0.75em;text-transform:uppercase;letter-spacing:2px;opacity:0.8;margin-bottom:8px}
+.daily-hero h2{font-size:1.4em;margin-bottom:6px}
+.daily-hero p{font-size:0.88em;opacity:0.85}
+
+/* Section headers */
+.section-title{font-size:1.1em;font-weight:600;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+
+/* Reset modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#000a;z-index:200;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.active{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:30px;max-width:400px;width:100%;text-align:center;animation:slideUp .3s}
+.modal h3{margin-bottom:12px}
+.modal p{color:var(--text-dim);font-size:0.9em;margin-bottom:20px}
+.modal-btns{display:flex;gap:10px;justify-content:center}
+
+@media(max-width:600px){
+.header h1{font-size:1.6em}
+.nav-btn{padding:8px 14px;font-size:0.8em}
+.stats-grid{grid-template-columns:repeat(2,1fr)}
+.lesson-actions{flex-direction:column}
+.btn{width:100%;justify-content:center}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="header">
+<h1>🧠 Influence Academy</h1>
+<p class="tagline">Master the psychology of persuasion</p>
+<div class="streak-badge" id="streakBadge">🔥 <span id="streakCount">0</span> day streak</div>
+</div>
+
+<nav class="nav" id="nav">
+<button class="nav-btn active" data-view="today" onclick="showView('today')">📅 Today</button>
+<button class="nav-btn" data-view="library" onclick="showView('library')">📚 Library</button>
+<button class="nav-btn" data-view="scenarios" onclick="showView('scenarios')">🎭 Scenarios</button>
+<button class="nav-btn" data-view="dashboard" onclick="showView('dashboard')">📊 Progress</button>
+</nav>
+
+<div id="todayView" class="view active"></div>
+<div id="libraryView" class="view"></div>
+<div id="lessonView" class="view"></div>
+<div id="scenariosView" class="view"></div>
+<div id="dashboardView" class="view"></div>
+</div>
+
+<div class="modal-overlay" id="resetModal">
+<div class="modal">
+<h3>⚠️ Reset All Progress?</h3>
+<p>This will erase all your completed lessons, quiz scores, and streak data. This can't be undone.</p>
+<div class="modal-btns">
+<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+<button class="btn" style="background:var(--danger);color:#fff" onclick="resetProgress()">Reset Everything</button>
+</div>
+</div>
+</div>
+
+<script>
+// ==================== DATA ====================
+const LESSONS = [
+// --- CIALDINI'S 6 PRINCIPLES ---
+{
+id:'reciprocity',cat:'Cialdini\'s Principles',icon:'🎁',title:'Reciprocity: Give First, Get More',time:3,
+content:`
+<p>Humans are <strong>hardwired to return favors</strong>. When someone gives us something — even something small and unsolicited — we feel a powerful compulsion to give back. This is the Reciprocity Principle, and it's one of the most reliable tools in persuasion.</p>
+
+<h3>Why It Works</h3>
+<p>Evolutionary survival depended on cooperation. People who didn't reciprocate got cast out. That ancient wiring is still firing — when someone does something for you, the discomfort of "owing" them drives action.</p>
+
+<h3>The Key Insight</h3>
+<p>The gift doesn't have to be proportional. A small, <strong>unexpected</strong> gesture can trigger a disproportionately large return. Studies show that mints with a restaurant check increase tips by up to 23% — for a few cents of candy.</p>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Before the consult even starts, give something valuable: "I put together a quick comparison of the treatment options for your specific skin type — here, take a look." You've invested in them before asking for anything. Now when you present pricing, they feel the pull to reciprocate your effort.</p></div>
+
+<h3>Advanced Tactics</h3>
+<ul>
+<li><strong>Personalize the gift</strong> — Generic = meh. "I noticed you mentioned X, so I looked into this specifically for you" = powerful</li>
+<li><strong>Concession reciprocity</strong> — Start with a bigger ask, then "compromise" to what you actually wanted. They feel like you gave something up.</li>
+<li><strong>Information as currency</strong> — Sharing insider knowledge or honest downsides builds reciprocity AND trust simultaneously</li>
+</ul>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>The most powerful reciprocity is <strong>unexpected and personalized</strong>. Don't make it feel transactional — make it feel like you genuinely went out of your way.</p></div>
+`,
+quiz:[
+{q:'Why does reciprocity work even when the initial gift is small?',opts:['People are just polite','The psychological discomfort of owing someone drives disproportionate response','Small gifts are more memorable','It only works with big gifts'],correct:1,explain:'The "debt" feeling is disproportionate to the gift size. Even tiny, unexpected gestures trigger the need to reciprocate — studies confirm this repeatedly.'},
+{q:'In the restaurant study, what increased tips by up to 23%?',opts:['Faster service','Complimenting customers','Providing mints with the check','Offering dessert samples'],correct:2,explain:'Two personalized mints with the check boosted tips 23%. Tiny cost, huge psychological impact.'},
+{q:'What makes reciprocity MOST powerful?',opts:['Making sure the client knows you expect something back','Giving something unexpected and personalized','Always giving expensive gifts','Reciprocating only after they buy'],correct:1,explain:'Unexpected + personalized = maximum impact. When it feels transactional, the magic dies.'},
+{q:'What is "concession reciprocity"?',opts:['Giving discounts','Starting with a bigger ask, then retreating to your real target','Admitting your product has flaws','Letting the client speak first'],correct:1,explain:'Also called "door-in-the-face" — the retreat from a larger request feels like a concession, triggering reciprocity.'}
+]},
+
+{
+id:'commitment',cat:'Cialdini\'s Principles',icon:'🤝',title:'Commitment & Consistency: The Yes Ladder',time:3,
+content:`
+<p>Once people take a stand or make a choice, they feel <strong>intense pressure to behave consistently</strong> with that commitment. This is why small yeses lead to big yeses — and why the best closers start closing from the first sentence.</p>
+
+<h3>The Psychology</h3>
+<p>Inconsistency is deeply uncomfortable. Our brains will rationalize, justify, and bend reality to maintain consistency with our past actions and statements. This isn't weakness — it's a cognitive shortcut that usually serves us well.</p>
+
+<h3>The Technique: Micro-Commitments</h3>
+<p>Get small agreements early and often. Each "yes" — even to trivial things — builds a psychological runway toward the big yes.</p>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>"You mentioned you've been thinking about this for a while, right?" (Yes.) "And you want something that actually gives lasting results?" (Yes.) "So if we could find a treatment plan that fits your budget and gets you those results, that would be worth exploring?" (Yes.) — You've just built three commitments pointing toward the close.</p></div>
+
+<h3>Written > Verbal</h3>
+<p>Written commitments are stronger. Public commitments are strongest. That's why having clients fill out forms, write down their goals, or verbally commit in front of a companion is so effective.</p>
+
+<ul>
+<li><strong>Start small</strong> — "Can I ask you a few questions about your goals?" (Yes) → commitment chain begins</li>
+<li><strong>Label their identity</strong> — "You seem like someone who does their research" → they'll act consistently with that label</li>
+<li><strong>Use their own words</strong> — Reflecting their statements back creates self-referencing consistency pressure</li>
+</ul>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>The most powerful commitment is one they think was their idea. Guide them to state their own reasons for wanting the treatment. Now they're selling themselves.</p></div>
+`,
+quiz:[
+{q:'Why do small yeses lead to big yeses?',opts:['People are just agreeable','Cognitive consistency pressure makes people align future behavior with past commitments','Saying yes is a habit','Small questions are easier to understand'],correct:1,explain:'Commitment and consistency is a deep cognitive bias — once you take a position, your brain works overtime to stay congruent with it.'},
+{q:'Which type of commitment is STRONGEST?',opts:['Verbal, private','Thought-based','Written and public','Implied through body language'],correct:2,explain:'Written commitments made publicly are the hardest to walk back. The more effort and visibility, the stronger the bind.'},
+{q:'What is the "Yes Ladder" technique?',opts:['Escalating prices','Getting a series of small agreements that build toward the main ask','Asking the same question repeatedly','Starting with the biggest question first'],correct:1,explain:'Each small "yes" increases the psychological probability of the next, bigger "yes." It builds momentum.'},
+{q:'Why is labeling someone\'s identity effective?',opts:['It\'s flattering','People act consistently with labels they accept about themselves','It creates fear','It distracts them'],correct:1,explain:'"You seem like someone who values quality" — now they\'ll make choices consistent with being a "quality person." Identity drives behavior.'}
+]},
+
+{
+id:'social-proof',cat:'Cialdini\'s Principles',icon:'👥',title:'Social Proof: The Power of "Everyone\'s Doing It"',time:3,
+content:`
+<p>When people are uncertain, they look to <strong>what others like them are doing</strong>. Social proof isn't just peer pressure — it's a fundamental decision-making shortcut that we all use, constantly, whether we realize it or not.</p>
+
+<h3>Why It's So Powerful</h3>
+<p>Making decisions is metabolically expensive. Our brains evolved to conserve energy by using heuristics — and "what are people like me doing?" is one of the strongest. In uncertain situations, social proof can override personal preferences.</p>
+
+<h3>Types of Social Proof</h3>
+<ul>
+<li><strong>Numbers</strong> — "Over 5 million treatments performed" → volume = safety</li>
+<li><strong>Similarity</strong> — "Clients with your exact skin type love this" → relevance</li>
+<li><strong>Authority figures</strong> — "Our medical director recommends..." → expertise</li>
+<li><strong>Trending behavior</strong> — "This is our most popular treatment right now" → momentum</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>"This is actually our most requested treatment for people in their late 20s. A lot of clients tell me they wish they'd started sooner — the results compound over time." You've stacked number proof + similarity proof + urgency in one natural sentence.</p></div>
+
+<h3>The Similarity Factor</h3>
+<p>Social proof from <strong>similar people</strong> is 3-4x more persuasive than proof from dissimilar people. A testimonial from someone the same age, gender, and skin type as your client is worth more than a celebrity endorsement.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>Create a mental library of client stories organized by demographic. When you can say "I had a client just last week, same situation as you..." — that's social proof gold.</p></div>
+`,
+quiz:[
+{q:'Why is social proof from similar people more effective?',opts:['Similar people are smarter','We trust people who look like us due to tribal instincts','The brain uses "what people like me do" as a decision shortcut','Similar people have better taste'],correct:2,explain:'Similarity-based social proof is 3-4x more effective because our brains specifically weight the behavior of people in our "in-group" when making decisions.'},
+{q:'Which statement uses social proof MOST effectively?',opts:['"This treatment is great"','"Our doctors recommend this"','"Clients with your skin type consistently see the best results with this treatment"','"We have many happy clients"'],correct:2,explain:'It combines similarity (your skin type), social proof (other clients), and results framing. Specific + relevant = powerful.'},
+{q:'"This is our most popular treatment right now" uses which type of social proof?',opts:['Authority','Similarity','Trending behavior / popularity','Fear-based'],correct:2,explain:'Trending/popularity proof leverages the "if many people are choosing it, it must be good" heuristic.'},
+{q:'When is social proof LEAST effective?',opts:['When the person is already confident in their decision','When many people have tried it','When the proof comes from similar people','When it\'s combined with scarcity'],correct:0,explain:'Social proof works best under uncertainty. When someone already knows what they want, others\' behavior matters less.'}
+]},
+
+{
+id:'authority',cat:'Cialdini\'s Principles',icon:'👨‍⚕️',title:'Authority: Why Credentials Close Deals',time:3,
+content:`
+<p>We are <strong>programmed to defer to authority</strong>. Not just legitimate authority — even the <em>appearance</em> of authority triggers compliance. Titles, uniforms, expertise signals — they all bypass our critical thinking.</p>
+
+<h3>The Milgram Effect</h3>
+<p>In the famous Milgram experiments, 65% of people administered what they believed were lethal shocks simply because an authority figure in a lab coat told them to. Authority is that powerful — and that dangerous to ignore in sales.</p>
+
+<h3>Building Your Authority</h3>
+<ul>
+<li><strong>Borrowed authority</strong> — "Our medical team developed this protocol based on clinical research..." → you inherit the team's credibility</li>
+<li><strong>Demonstrate knowledge</strong> — Explain the science briefly. Clients can't evaluate your skill directly, but they CAN evaluate how confidently and clearly you explain things</li>
+<li><strong>Honest downsides</strong> — Surprisingly, mentioning a small negative FIRST increases your authority. It signals you're not just selling</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>"So the honest truth is, you'll probably need 6-8 sessions for optimal results — I know some places promise miracles in one session, but the science doesn't support that. What DOES work is the wavelength technology we use, which targets the follicle at the growth stage..." You've used honesty to establish authority, then leveraged that authority to educate.</p></div>
+
+<h3>The Weakness-First Technique</h3>
+<p>Mention a minor weakness before your strength. "It's not the cheapest option — but it's the only one that actually targets the root cause." The admission of weakness makes everything after it more believable.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>Your tone matters as much as your words. Speak with <strong>calm certainty</strong>, not aggressive convincing. Authority whispers; insecurity shouts.</p></div>
+`,
+quiz:[
+{q:'Why does mentioning a weakness INCREASE your authority?',opts:['It makes you seem humble','It signals honesty, making subsequent claims more credible','People like self-deprecation','It lowers expectations'],correct:1,explain:'The weakness-first technique works because admitting a downside signals you\'re not just selling — making your positive claims feel more trustworthy.'},
+{q:'In the Milgram experiments, what percentage of participants obeyed the authority figure fully?',opts:['25%','45%','65%','85%'],correct:2,explain:'65% administered what they believed were maximum shocks. The power of perceived authority is enormous.'},
+{q:'Which is an example of "borrowed authority"?',opts:['Wearing a nice watch','"Our board-certified medical team designed this protocol"','Talking loudly','Name-dropping celebrities'],correct:1,explain:'Borrowed authority transfers credibility from a recognized expert/institution to you. Medical credentials are particularly powerful in aesthetic treatments.'},
+{q:'How should authority be communicated?',opts:['Aggressively and loudly','With calm certainty','By constantly mentioning your credentials','By talking over the client'],correct:1,explain:'Authority whispers; insecurity shouts. Calm certainty signals genuine expertise far more than aggressive persuasion.'}
+]},
+
+{
+id:'liking',cat:'Cialdini\'s Principles',icon:'😊',title:'Liking: People Buy from People They Like',time:3,
+content:`
+<p>We say yes to people we <strong>like</strong>. Obvious? Sure. But most salespeople underestimate HOW much liking matters and how systematically you can build it. This isn't about being fake — it's about being strategically genuine.</p>
+
+<h3>The Five Drivers of Liking</h3>
+<ul>
+<li><strong>Physical attractiveness</strong> — The halo effect is real. Look put-together. It's not vanity, it's psychology.</li>
+<li><strong>Similarity</strong> — We like people who are like us. Mirror their energy, reference shared experiences.</li>
+<li><strong>Compliments</strong> — Even when people KNOW a compliment is strategic, it still works. But genuine > generic.</li>
+<li><strong>Familiarity</strong> — Repeated, positive contact breeds liking. Follow up = become familiar.</li>
+<li><strong>Association</strong> — Connect yourself with positive things. Weather, good news, their favorite things.</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>In the first 60 seconds, find one genuine connection point. "Oh, I love your nails — where did you get them done?" or "Is that the new iPhone case? I've been looking at those." It takes 10 seconds and completely changes the dynamic from "salesperson vs. buyer" to "two people talking."</p></div>
+
+<h3>The Similarity Shortcut</h3>
+<p>You don't need to actually BE similar — you need to <strong>find and highlight genuine commonalities</strong>. Background, interests, values, experiences. One real connection point outweighs 30 minutes of polished pitching.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>People don't remember what you said. They remember <strong>how you made them feel</strong>. A warm, genuine interaction creates a halo effect that makes everything else — pricing, treatment plans, follow-ups — land better.</p></div>
+`,
+quiz:[
+{q:'What are the five drivers of liking?',opts:['Money, power, status, fame, beauty','Attractiveness, similarity, compliments, familiarity, association','Intelligence, humor, kindness, wealth, skill','Trust, honesty, loyalty, warmth, competence'],correct:1,explain:'Cialdini identified these five specific drivers: physical attractiveness, similarity, compliments, familiarity (repeated contact), and positive association.'},
+{q:'Why do compliments work even when people know they\'re strategic?',opts:['People are gullible','The positive emotional response happens before rational analysis can block it','Compliments are always sincere','People forget they were complimented'],correct:1,explain:'The emotional impact of a compliment hits before our critical filter can fully engage. Even "obvious" compliments create positive feeling.'},
+{q:'What\'s the most efficient way to build liking in a consult?',opts:['Give a long personal story','Find one genuine connection point in the first 60 seconds','Offer a discount','Memorize their file beforehand'],correct:1,explain:'One authentic connection point early on shifts the dynamic from transactional to personal. It doesn\'t need to be deep — just real.'}
+]},
+
+{
+id:'scarcity',cat:'Cialdini\'s Principles',icon:'⏰',title:'Scarcity: Why "Limited" Means "Must Have"',time:3,
+content:`
+<p>Things become <strong>more desirable when they're scarce</strong>. Limited time, limited spots, limited availability — scarcity triggers loss aversion and FOMO, two of the most powerful motivators in human psychology.</p>
+
+<h3>The Double Power of Scarcity</h3>
+<p>Scarcity does two things simultaneously: it increases perceived value AND it creates urgency to act. Something available forever has no urgency. Something disappearing tomorrow demands a decision NOW.</p>
+
+<h3>Real vs. Manufactured Scarcity</h3>
+<p>Authentic scarcity is ethical and more effective. Manufactured scarcity (fake countdown timers, "only 2 left!" that never changes) erodes trust. Use real constraints:</p>
+<ul>
+<li><strong>Time-bound pricing</strong> — "This promotional rate ends Friday" (if it actually does)</li>
+<li><strong>Appointment scarcity</strong> — "My next opening isn't for three weeks" (if true)</li>
+<li><strong>Seasonal relevance</strong> — "Starting now means results by summer" (natural deadline)</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>"I should mention — this package pricing is part of our March special, so it's only available through the end of the month. After that, the sessions go back to individual pricing. No pressure at all, I just want to make sure you have the full picture." The "no pressure" disclaimer actually increases the scarcity effect by making you seem fair rather than pushy.</p></div>
+
+<h3>Loss Framing + Scarcity</h3>
+<p>Combine scarcity with loss language: "If you wait, you'd miss..." is more motivating than "If you act now, you'll get..." People are twice as motivated by avoiding losses as gaining equivalent wins.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>The "no pressure" technique: Present scarcity information as if you're doing them a favor by sharing it, not as a pressure tactic. "I just want to be transparent about the timing" feels helpful, not salesy.</p></div>
+`,
+quiz:[
+{q:'Why does scarcity increase perceived value?',opts:['Rare things are always better','Our brains associate availability with value — scarce = valuable, abundant = ordinary','Marketing creates real value','Scarcity doesn\'t affect value, only urgency'],correct:1,explain:'It\'s a cognitive shortcut: if something is hard to get, our brains assume it must be worth getting. This happens automatically.'},
+{q:'Which scarcity approach is MOST effective long-term?',opts:['Fake countdown timers','Manufactured limited editions','"Only 1 left!" warnings','Authentic, verifiable constraints'],correct:3,explain:'Real scarcity builds trust AND creates urgency. Manufactured scarcity might work once but destroys credibility when detected.'},
+{q:'Why does adding "no pressure" actually INCREASE the scarcity effect?',opts:['It relaxes the client','It makes you seem fair rather than pushy, increasing trust in the scarcity claim','It\'s reverse psychology','It creates confusion'],correct:1,explain:'When you signal you\'re not pressuring them, it frames you as an honest advisor — making the scarcity information feel like a helpful heads-up rather than a tactic.'},
+{q:'What makes loss framing + scarcity so powerful together?',opts:['Double negatives confuse people','People are 2x more motivated to avoid losses than to gain equivalent wins','It sounds more professional','Loss framing is just scarcity in different words'],correct:1,explain:'Loss aversion (Kahneman & Tversky) shows losses are psychologically ~2x as painful as equivalent gains feel good. Combined with scarcity\'s urgency, it\'s a powerful motivator.'}
+]},
+
+// --- DARK PSYCHOLOGY ---
+{
+id:'anchoring',cat:'Dark Psychology',icon:'⚓',title:'Anchoring: The First Number Wins',time:3,
+content:`
+<p>The first piece of information we encounter <strong>becomes a reference point for everything after</strong>. This is anchoring — and it's so powerful that even obviously irrelevant numbers can shift our judgments by 30-50%.</p>
+
+<h3>How Anchoring Works</h3>
+<p>Your brain doesn't evaluate things in a vacuum. It evaluates them <strong>relative to available reference points</strong>. The first number sets the scale. Everything after is judged as "more than" or "less than" that anchor.</p>
+
+<h3>The Experiment</h3>
+<p>Kahneman and Tversky spun a rigged wheel that landed on either 10 or 65, then asked people to estimate the percentage of African countries in the UN. People who saw 65 guessed ~45%. People who saw 10 guessed ~25%. A random, obviously irrelevant number shifted expert estimates by 20 points.</p>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Show the full package price first: "Our complete 8-session package is typically $4,800." Pause. Let that anchor set. Then: "But with the current promotion, you'd be looking at $3,200 for the same package." That $4,800 is now the reference point, making $3,200 feel like a steal — even if $3,200 was always the target price.</p></div>
+
+<h3>Anchoring Tactics</h3>
+<ul>
+<li><strong>Price anchoring</strong> — Show the expensive option first. Everything after feels reasonable.</li>
+<li><strong>Competitor anchoring</strong> — "Some clinics charge $X per session" → your price feels better</li>
+<li><strong>Value anchoring</strong> — "If you think about the cost per treatment over 2 years..." → reframe the math</li>
+<li><strong>Lifestyle anchoring</strong> — "That's less than your daily coffee" → shrink the number against familiar spending</li>
+</ul>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>Always anchor HIGH, then work down. Never start with the cheapest option — you lose the ability to make anything feel like a deal.</p></div>
+`,
+quiz:[
+{q:'In Kahneman & Tversky\'s wheel experiment, how much did an irrelevant number shift estimates?',opts:['5 points','10 points','20 points','50 points'],correct:2,explain:'Seeing 65 vs. 10 on a random wheel shifted UN membership estimates by ~20 percentage points. Anchoring works even with clearly irrelevant numbers.'},
+{q:'Why should you show the most expensive option FIRST?',opts:['To scare clients into the cheaper option','To set a high anchor that makes subsequent prices feel more reasonable','To seem prestigious','To weed out non-serious clients'],correct:1,explain:'The first price becomes the reference point. Everything after is evaluated relative to it. High anchor → other options feel like deals.'},
+{q:'What is "lifestyle anchoring"?',opts:['Anchoring to a celebrity\'s lifestyle','Comparing the price to familiar daily spending to make it feel small','Showing how the treatment improves lifestyle','Comparing to competitors\' prices'],correct:1,explain:'"That\'s less than your daily Starbucks" reframes a large number against a familiar, already-accepted expense — making it feel trivial.'},
+{q:'When does anchoring NOT work well?',opts:['When the client already has strong prior knowledge and their own anchor','When the price is high','When used in person','When combined with social proof'],correct:0,explain:'If someone walks in with a firm budget number or has researched pricing extensively, they have their own anchor — yours has to compete with it.'}
+]},
+
+{
+id:'framing',cat:'Dark Psychology',icon:'🖼️',title:'Framing: Same Facts, Different Decisions',time:3,
+content:`
+<p>How you <strong>frame</strong> information completely changes how people respond to it. The facts don't change — but the decision does. Framing is perhaps the most versatile tool in your persuasion toolkit.</p>
+
+<h3>The Classic Study</h3>
+<p>Doctors presented with "90% survival rate" chose surgery. Presented with "10% mortality rate" — same facts — they avoided it. <strong>Same information. Opposite decisions.</strong></p>
+
+<h3>Key Framing Types</h3>
+<ul>
+<li><strong>Gain vs. Loss</strong> — "Save $500" vs "Don't lose $500" → loss frame is 2x more motivating</li>
+<li><strong>Per-unit reframing</strong> — "$3,600/year" → "$10/day" → "Less than your morning coffee"</li>
+<li><strong>Positive vs. Negative</strong> — "95% satisfaction rate" vs "Only 5% are unsatisfied"</li>
+<li><strong>Comparison framing</strong> — "Half the price of surgery" vs "$2,000 per treatment"</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Instead of: "The package costs $3,000." Try: "So over the course of treatment, it works out to about $8 a day — and you'll never have to buy razors, shaving cream, or deal with ingrown hairs again. Most clients tell me they actually save money in the long run." You've reframed from a big scary number to a tiny daily cost, then flipped it to a savings frame.</p></div>
+
+<h3>The Choice Architecture</h3>
+<p>How you present options IS the frame. Three options? People pick the middle. Two options? They compare features. One option? They compare to "do nothing." Design the choice set intentionally.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>Frame the "do nothing" option too. "Of course, you can keep spending $200/month on waxing, dealing with the ingrown hairs and the appointments every few weeks..." Make inaction feel expensive.</p></div>
+`,
+quiz:[
+{q:'In the surgery study, what happened when doctors heard "10% mortality rate" vs "90% survival rate"?',opts:['They made the same decision','More chose surgery with mortality framing','More avoided surgery with mortality framing','The framing had no effect on doctors'],correct:2,explain:'Same facts, opposite decisions. Even trained doctors are swayed by framing — it\'s not about intelligence, it\'s about cognitive architecture.'},
+{q:'Why is per-unit reframing effective?',opts:['It hides the true cost','Small daily amounts feel manageable and comparable to existing spending','People can\'t do math','It sounds more professional'],correct:1,explain:'$10/day feels trivial. $3,600/year feels huge. Same money, different psychological reality. And you can compare to existing daily purchases.'},
+{q:'What is "choice architecture"?',opts:['Building physical structures','Designing how options are presented to influence which one gets chosen','Giving unlimited options','Only offering one choice'],correct:1,explain:'The way you structure and present choices IS a persuasion tool. Number of options, order, and framing all guide the decision.'},
+{q:'Why should you frame the "do nothing" option?',opts:['To make the client feel guilty','To make inaction feel costly so the treatment looks like a smart investment by comparison','To confuse the client','Do nothing is always the best frame'],correct:1,explain:'If "do nothing" feels free, your treatment is just a cost. If "do nothing" feels expensive (ongoing waxing, razors, etc.), your treatment becomes a smart investment.'}
+]},
+
+{
+id:'loss-aversion',cat:'Dark Psychology',icon:'💔',title:'Loss Aversion: Fear of Missing > Desire of Getting',time:3,
+content:`
+<p>Losing $100 hurts <strong>roughly twice as much</strong> as gaining $100 feels good. This asymmetry — loss aversion — is one of the most robust findings in behavioral economics, and it's a cornerstone of persuasive communication.</p>
+
+<h3>The Math of Emotion</h3>
+<p>Kahneman and Tversky's Prospect Theory showed that losses loom roughly 2x larger than equivalent gains. This means every persuasion message has a more powerful version: the one that frames what they'll LOSE by not acting.</p>
+
+<h3>Loss Aversion in Action</h3>
+<ul>
+<li><strong>"Don't miss out on..."</strong> > "You could get..."</li>
+<li><strong>"You'd be giving up..."</strong> > "You'd be getting..."</li>
+<li><strong>"This rate expires..."</strong> > "This rate is available..."</li>
+<li><strong>"Every day you wait, you're losing..."</strong> > "Starting today, you'd gain..."</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Instead of: "Starting treatment now will give you smooth skin by summer." Try: "Every week you wait is another week of razor burn, ingrown hairs, and money spent on temporary fixes. You've been dealing with this for years — how much have you already spent on solutions that don't last?" Now the cost of INaction is front and center.</p></div>
+
+<h3>The Endowment Effect</h3>
+<p>Once people feel ownership of something, loss aversion kicks in. This is why free trials and "holds" work — once they mentally own it, giving it up feels like a loss.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>Use future pacing to create mental ownership: "Imagine it's July, you're at the beach, and you haven't thought about shaving in months..." Now taking that away (by not buying) triggers loss aversion.</p></div>
+`,
+quiz:[
+{q:'How much more do losses hurt compared to equivalent gains?',opts:['About the same','1.5x more','Roughly 2x more','5x more'],correct:2,explain:'Kahneman and Tversky found losses are approximately twice as painful as equivalent gains are pleasurable. This 2:1 ratio is remarkably consistent across studies.'},
+{q:'What is the "endowment effect"?',opts:['Wealthy people buy more','People overvalue things they feel they already own','Getting free stuff makes people happy','Charitable giving increases sales'],correct:1,explain:'Once we feel ownership (even psychologically), losing it triggers loss aversion. That\'s why free trials convert so well — giving it back feels like losing it.'},
+{q:'Which is a loss-framed version of "You\'ll get beautiful skin"?',opts:['"Our treatments are the best"','"You deserve beautiful skin"','"Every day without treatment is another day you\'re stuck with skin you\'re not happy with"','"Beautiful skin is just a treatment away"'],correct:2,explain:'It reframes from gaining something nice to losing something every day — making the cost of inaction vivid and painful.'}
+]},
+
+{
+id:'decoy-effect',cat:'Dark Psychology',icon:'🎯',title:'The Decoy Effect: Engineering the "Obvious" Choice',time:2,
+content:`
+<p>Add a strategically inferior option and you can <strong>shift choices by 30-40%</strong> toward your target option. This is the Decoy Effect (asymmetric dominance), and it works because our brains evaluate options <em>relative to each other</em>, not in absolute terms.</p>
+
+<h3>How It Works</h3>
+<p>Imagine two options: A ($50, basic) and B ($100, premium). People are split. Now add C ($95, basic+). Nobody picks C, but suddenly B looks amazing — for just $5 more, you get premium instead of basic+. C is the decoy. Its only job is to make B look like the smart choice.</p>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Package structure: <br>
+<strong>Option A:</strong> 4 sessions — $1,600 <br>
+<strong>Option B:</strong> 6 sessions — $2,000 (THE TARGET) <br>
+<strong>Option C:</strong> 8 sessions — $3,200 <br><br>
+Option C makes Option B look like incredible value. And Option A makes it clear that B offers significantly more for just $400 extra. B is asymmetrically dominant, and most clients will "choose" it — feeling smart about it.</p></div>
+
+<h3>Design Principles</h3>
+<ul>
+<li><strong>The decoy should be close to your target</strong> in price but clearly inferior in value</li>
+<li><strong>Three options is the sweet spot</strong> — two feels limiting, four feels overwhelming</li>
+<li><strong>Order matters</strong> — present the decoy right before or after your target</li>
+</ul>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>Present your target option second (in the middle). Combined with a well-placed decoy, the "middle option" bias and the decoy effect work together to make your target feel like the natural, smart choice.</p></div>
+`,
+quiz:[
+{q:'What is the decoy\'s purpose in a three-option set?',opts:['To be the cheapest option','To catch bargain hunters','To make the target option look superior by comparison','To confuse the buyer'],correct:2,explain:'The decoy exists solely to make another option look better. Nobody is supposed to pick it — it\'s there to shift perception of the target.'},
+{q:'Why is three options the "sweet spot"?',opts:['People can only hold three things in memory','Two feels limiting, four feels overwhelming — three allows comparison without paralysis','Three is a lucky number','It looks more professional'],correct:1,explain:'Two options force a binary comparison. Four or more creates choice paralysis. Three gives enough to compare while naturally guiding toward the middle.'},
+{q:'A decoy should be:',opts:['The best value option','Close to the target in price but clearly inferior in value','The cheapest option','Identical to the target'],correct:1,explain:'The decoy needs to be close enough to the target to invite comparison, but inferior enough that the target wins every time. That asymmetry is what drives the effect.'}
+]},
+
+// --- BODY LANGUAGE ---
+{
+id:'micro-expressions',cat:'Body Language',icon:'🔍',title:'Reading Micro-Expressions: The Face Never Lies',time:3,
+content:`
+<p>Micro-expressions are <strong>involuntary facial expressions lasting 1/25th to 1/5th of a second</strong>. They leak true emotions before the conscious mind can mask them. Learning to spot them gives you a real-time read on what your client is actually feeling.</p>
+
+<h3>The Seven Universal Micro-Expressions</h3>
+<ul>
+<li><strong>😊 Happiness</strong> — Crow's feet wrinkles + cheek raise. Fake smiles don't crinkle the eyes (Duchenne marker)</li>
+<li><strong>😢 Sadness</strong> — Inner eyebrow corners pull up, lip corners pull down</li>
+<li><strong>😠 Anger</strong> — Eyebrows pull down and together, lips tighten or press</li>
+<li><strong>😨 Fear</strong> — Eyebrows raise and pull together, eyes widen, mouth slightly open</li>
+<li><strong>🤢 Disgust</strong> — Upper lip raises, nose wrinkles, cheeks rise</li>
+<li><strong>😮 Surprise</strong> — Eyebrows arch, eyes open wide, jaw drops (brief — if it lasts, it's fake)</li>
+<li><strong>😤 Contempt</strong> — One-sided mouth raise (the only asymmetric micro-expression). THIS IS YOUR RED FLAG.</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>You present the price. Watch for: <br>
+• <strong>Surprise flash → neutral</strong> = expected it to be higher. You're in good shape. <br>
+• <strong>Contempt flash</strong> (one-sided lip raise) = they think it's unreasonable. Address value immediately. <br>
+• <strong>Fear flash</strong> = they want it but the cost scares them. Focus on payment plans and ROI. <br>
+• <strong>Disgust flash</strong> = strong negative reaction. Reframe or switch options entirely.</p></div>
+
+<h3>Training Your Eye</h3>
+<p>You can't catch micro-expressions by staring. Relax your gaze — use <strong>soft focus</strong> on the upper face (eyebrows and eye area). Peripheral vision catches fast movements better than direct focus.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>Contempt is the #1 expression to watch for in sales. It's the only emotion that predicts relationship failure — if you see it, you've lost rapport. Stop pitching and rebuild the connection.</p></div>
+`,
+quiz:[
+{q:'How long does a micro-expression typically last?',opts:['1-2 seconds','5-10 seconds','1/25th to 1/5th of a second','Several minutes'],correct:2,explain:'Micro-expressions flash in fractions of a second — they\'re involuntary leaks of true emotion before the conscious mask can engage.'},
+{q:'How do you tell a genuine smile from a fake one?',opts:['Genuine smiles show teeth','Genuine smiles involve crow\'s feet/eye crinkling (Duchenne marker)','Fake smiles last longer','You can\'t tell the difference'],correct:1,explain:'The Duchenne marker — engagement of the orbicularis oculi muscle creating crow\'s feet — is the key. It\'s extremely difficult to fake.'},
+{q:'Which micro-expression is your biggest red flag in a sales conversation?',opts:['Surprise','Sadness','Contempt (one-sided mouth raise)','Fear'],correct:2,explain:'Contempt signals the person thinks you/your offer is beneath them. It\'s the only emotion predicting relationship failure. If you see it, stop pitching and rebuild rapport.'},
+{q:'What\'s the best way to spot micro-expressions?',opts:['Stare intensely at their mouth','Use soft focus on the upper face area','Watch their hands','Record the conversation'],correct:1,explain:'Soft focus on the eyebrow/eye area catches fast movements better. Direct staring actually makes you worse at detecting quick changes — peripheral vision is faster.'}
+]},
+
+{
+id:'mirroring',cat:'Body Language',icon:'🪞',title:'Mirroring & Matching: The Rapport Shortcut',time:2,
+content:`
+<p>When we unconsciously <strong>mirror someone's body language, speech patterns, and energy</strong>, it signals "I'm like you. I'm safe." Deliberate mirroring — done subtly — accelerates rapport building by 2-3x.</p>
+
+<h3>What to Mirror</h3>
+<ul>
+<li><strong>Posture</strong> — If they lean forward, lean forward. If they're relaxed, relax.</li>
+<li><strong>Gesture pace</strong> — Fast talker with big gestures? Speed up. Slow and measured? Slow down.</li>
+<li><strong>Voice</strong> — Match their volume, pace, and tone (the most powerful mirror)</li>
+<li><strong>Breathing</strong> — Advanced: sync your breathing rhythm. Creates deep subconscious connection.</li>
+<li><strong>Language</strong> — Use their words, not synonyms. If they say "chill" don't say "relaxed."</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Client walks in high-energy, talking fast, lots of hand gestures? Match that energy — be animated, enthusiastic, speak their pace. Another client is quiet, thoughtful, measured? Slow down, soften your voice, give them space to think. Same you, different mirrors.</p></div>
+
+<h3>The 2-Second Rule</h3>
+<p>Don't mirror instantly — that looks mimicking. Wait 2-3 seconds before matching a posture change. It should be subtle enough that they never notice consciously, but their subconscious registers "same tribe."</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p><strong>Voice matching</strong> is the most powerful and least detected form of mirroring. Match their speaking pace and you'll build rapport faster than any other technique.</p></div>
+`,
+quiz:[
+{q:'Why does mirroring build rapport?',opts:['It shows you\'re paying attention','It\'s flattering','It triggers subconscious "in-group" recognition — similar = safe','It makes people think you agree with them'],correct:2,explain:'Mirroring activates deep tribal recognition circuits. When someone moves/speaks like us, our brain categorizes them as "like me" = trustworthy.'},
+{q:'What\'s the most powerful form of mirroring?',opts:['Copying their outfit','Matching their posture exactly','Voice matching (pace, tone, volume)','Using the same hand gestures'],correct:2,explain:'Voice matching is both the most powerful and least consciously detected form of mirroring. People rarely notice it but strongly feel the rapport.'},
+{q:'Why should you wait 2-3 seconds before matching a posture change?',opts:['To be polite','So it doesn\'t look like deliberate mimicking','Because it\'s more comfortable','To show independence'],correct:1,explain:'Instant mirroring looks like mockery. A 2-3 second delay makes it feel natural and keeps it below conscious awareness while still triggering rapport.'}
+]},
+
+{
+id:'power-poses',cat:'Body Language',icon:'💪',title:'Power Poses & Space: Projecting Confidence',time:2,
+content:`
+<p>The space you take up and the way you hold your body doesn't just <strong>signal</strong> confidence — it can actually <strong>create</strong> it. Power posing research is debated, but the core principle is solid: expansive body language changes how others perceive you and how you feel.</p>
+
+<h3>High-Power vs. Low-Power Signals</h3>
+<ul>
+<li><strong>Expansive</strong> (arms open, shoulders back, chin level) = confident, trustworthy, authoritative</li>
+<li><strong>Contracted</strong> (arms crossed, hunched, touching face/neck) = nervous, uncertain, untrustworthy</li>
+<li><strong>Steepling hands</strong> (fingertips together) = calm confidence. Use while explaining treatment benefits.</li>
+<li><strong>Open palms</strong> = honesty, nothing to hide. Use when discussing pricing.</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Before the consult: Stand tall, shoulders back, take 3 deep breaths. During: Keep hands visible, lean slightly forward (engagement), maintain eye contact ~70% of the time. When presenting price: Open palms, steady voice, slight nod. Your body language should say "this is a great deal and I know it."</p></div>
+
+<h3>Reading Client Power Signals</h3>
+<p>Watch for shifts: client goes from open to crossed arms? You just said something that created resistance. They lean in? Interest spike. They touch their neck? Discomfort or uncertainty — slow down and check in.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>The <strong>70/30 eye contact rule</strong>: maintain eye contact ~70% of the time when speaking, ~80% when listening. Too much = intimidating. Too little = untrustworthy. The sweet spot builds connection.</p></div>
+`,
+quiz:[
+{q:'What does hand steepling (fingertips together) signal?',opts:['Nervousness','Prayer','Calm confidence and certainty','Boredom'],correct:2,explain:'Steepling is one of the most powerful confidence signals. Leaders and experts naturally do it. Use it while explaining treatment benefits.'},
+{q:'If a client suddenly crosses their arms during your pitch, what likely happened?',opts:['They\'re cold','You triggered resistance or defensiveness — something you said created a barrier','They\'re thinking deeply','They always sit that way'],correct:1,explain:'A sudden shift to closed posture (especially arms crossed) usually signals a psychological barrier just went up. Address it before continuing.'},
+{q:'What\'s the ideal amount of eye contact in a sales conversation?',opts:['100% — never break contact','About 70% when speaking, 80% when listening','About 30%','Only when they\'re speaking'],correct:1,explain:'70/30 is the sweet spot. Too much eye contact feels aggressive. Too little signals dishonesty or discomfort.'}
+]},
+
+// --- NLP ---
+{
+id:'rapport-nlp',cat:'NLP Fundamentals',icon:'🔗',title:'NLP Rapport: Beyond Surface Connection',time:3,
+content:`
+<p>NLP (Neuro-Linguistic Programming) takes rapport building deeper than body language. It's about <strong>matching someone's internal model of the world</strong> — how they process, organize, and communicate their experience.</p>
+
+<h3>Representational Systems</h3>
+<p>People process information primarily through one of three systems. Listen for their language clues:</p>
+<ul>
+<li><strong>Visual</strong> — "I see what you mean," "That looks good," "Picture this" → Use vivid imagery, show photos, paint word pictures</li>
+<li><strong>Auditory</strong> — "That sounds right," "I hear you," "Tell me more" → Use voice modulation, explain thoroughly, use dialogue examples</li>
+<li><strong>Kinesthetic</strong> — "That feels right," "I'm grasping it," "Let's touch on this" → Use experiential language, let them touch/feel samples, focus on emotions</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Visual client: "Let me show you some before-and-afters of clients with similar skin. Can you picture yourself with those results by summer?"<br><br>
+Auditory client: "Let me walk you through exactly how the technology works and what you can expect at each stage."<br><br>
+Kinesthetic client: "The treatment feels like a warm snap — most clients say it's way more comfortable than they expected. You'll literally feel the difference within weeks."</p></div>
+
+<h3>Quick Calibration</h3>
+<p>In the first 2-3 minutes of conversation, listen for sensory language. Do they say "looks good" or "sounds good" or "feels good"? That's your roadmap. Match their system and your words will resonate at a deeper level.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>When in doubt, stack all three: "Picture the results (visual), I'm telling you it's incredible (auditory), you're going to feel amazing (kinesthetic)." You'll hit whatever system they're in.</p></div>
+`,
+quiz:[
+{q:'If a client says "I need to see the results before I decide," which representational system are they likely using?',opts:['Auditory','Kinesthetic','Visual','Digital/logical'],correct:2,explain:'"See" is a visual keyword. Match with photos, before/afters, and visual language: "Let me show you," "picture this."'},
+{q:'How quickly should you calibrate a client\'s primary system?',opts:['After the consultation','In the first 2-3 minutes','After several meetings','You can\'t calibrate this quickly'],correct:1,explain:'Pay attention to their sensory language in the first few minutes. "Sounds good" vs "looks good" vs "feels right" — the clues come fast if you\'re listening.'},
+{q:'What\'s the safest approach when you can\'t determine their system?',opts:['Default to visual','Ask them directly','Stack all three representational systems in your language','Stay silent'],correct:2,explain:'When in doubt, use all three: "Picture this... I\'m telling you... you\'ll feel the difference." You\'ll match whatever system they\'re processing in.'}
+]},
+
+{
+id:'reframing',cat:'NLP Fundamentals',icon:'🔄',title:'Reframing: Changing the Meaning, Not the Facts',time:3,
+content:`
+<p>Reframing takes something the client sees as negative and <strong>presents it in a new context that changes its meaning</strong>. The facts stay the same — the interpretation shifts entirely.</p>
+
+<h3>Two Types of Reframe</h3>
+<ul>
+<li><strong>Context reframe</strong> — "That's expensive" → "Compared to what? A lifetime of waxing costs 3x this much."</li>
+<li><strong>Meaning reframe</strong> — "I'm nervous about trying something new" → "That nervousness? That's your instincts telling you this matters to you. People only get nervous about things they care about."</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Client: "That's a lot of money." <br>
+<strong>Context reframe:</strong> "I totally get that — and when you divide it across 8 sessions, it's less than what most people spend on their hair each month. But unlike a haircut, these results are permanent."<br><br>
+Client: "I'm not sure it'll work for me."<br>
+<strong>Meaning reframe:</strong> "The fact that you're being cautious actually tells me you're the kind of person who makes smart decisions. Let me show you the data for your specific skin type so you can make an informed choice."</p></div>
+
+<h3>The Reframe Formula</h3>
+<p>1. <strong>Acknowledge</strong> their concern (never dismiss it)<br>
+2. <strong>Bridge</strong> with "and" (not "but" — "but" erases everything before it)<br>
+3. <strong>Recontextualize</strong> with new information or perspective</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>Replace "but" with "and" in your vocabulary. "I understand your concern, but..." negates the acknowledgment. "I understand your concern, and here's what I've seen..." builds on it.</p></div>
+`,
+quiz:[
+{q:'What\'s the difference between context and meaning reframes?',opts:['There is no difference','Context changes the situation; meaning changes the interpretation of the same situation','Context is for pricing; meaning is for emotions','Context is verbal; meaning is nonverbal'],correct:1,explain:'Context reframe: "expensive compared to what?" changes the comparison. Meaning reframe: "your nervousness means you care" changes how they interpret their own feeling.'},
+{q:'Why should you replace "but" with "and"?',opts:['"But" sounds unprofessional','"But" psychologically negates everything before it; "and" connects ideas additively','There\'s no difference','Grammar rules'],correct:1,explain:'"I hear you, BUT..." = "I\'m about to dismiss what you said." "I hear you, AND..." = "I\'m building on what you said." Huge difference in how it lands.'},
+{q:'What\'s the first step of the reframe formula?',opts:['Present new information','Challenge their view','Acknowledge their concern','Change the subject'],correct:2,explain:'Always validate first. If you skip acknowledgment, the reframe feels dismissive. People can\'t hear your new frame until they feel heard.'}
+]},
+
+{
+id:'pacing-leading',cat:'NLP Fundamentals',icon:'🚶',title:'Pacing & Leading: Walk With Them, Then Guide',time:2,
+content:`
+<p>You can't lead someone who doesn't trust you. <strong>Pacing</strong> means matching their current reality — emotions, beliefs, concerns. <strong>Leading</strong> means gradually guiding them toward a new perspective. Pace, pace, pace... then lead.</p>
+
+<h3>How It Works</h3>
+<p>First, demonstrate that you understand their world (pacing). Once they feel understood, their resistance drops and they're psychologically ready to follow you somewhere new (leading).</p>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p><strong>Pace:</strong> "I know there's a lot of information out there, and it's hard to know what actually works. You've probably tried a few things already. And it makes total sense that you'd want to be careful before investing in something new."<br><br>
+<strong>Lead:</strong> "What I've found is that the clients who do the most research actually end up the happiest with their results — because they go in with realistic expectations. Let me show you exactly what to expect, step by step."<br><br>
+You paced their uncertainty three times, then led them toward confidence.</p></div>
+
+<h3>The Ratio</h3>
+<p>For resistant clients: pace 3-4 times before leading once. For eager clients: 1-2 paces is enough. The more resistance, the more pacing required.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>"Yes, and..." is the simplest pacing-leading structure. Yes = pace (I'm with you). And = lead (here's where we go). Improv comedians use it — now you can too.</p></div>
+`,
+quiz:[
+{q:'What does "pacing" mean in NLP?',opts:['Walking at the same speed','Matching and validating the client\'s current reality before trying to change it','Setting the pace of the conversation','Speaking quickly'],correct:1,explain:'Pacing is meeting them where they are — their emotions, beliefs, concerns. It says "I get you" before you try to "move you."'},
+{q:'For a highly resistant client, what\'s the recommended pace-to-lead ratio?',opts:['1:1','2:1','3-4 paces before 1 lead','Lead immediately, no pacing needed'],correct:2,explain:'More resistance = more pacing needed. You need to build substantial trust before they\'ll let you guide them. Rushing the lead creates pushback.'},
+{q:'Why does "Yes, and..." work so well?',opts:['It\'s grammatically correct','It\'s the simplest pace-lead structure — "Yes" validates, "and" redirects','People like being agreed with','It buys time to think'],correct:1,explain:'"Yes" is pure pacing — I\'m with you, I hear you. "And" is the bridge to leading — here\'s where I want to take this. Clean, natural, effective.'}
+]},
+
+// --- OBJECTION PSYCHOLOGY ---
+{
+id:'why-people-say-no',cat:'Objection Psychology',icon:'🚫',title:'Why People Really Say No (It\'s Not What They Tell You)',time:3,
+content:`
+<p>When a client says no, they almost never tell you the <strong>real reason</strong>. The stated objection is a socially acceptable cover for the actual barrier. Your job isn't to overcome what they say — it's to discover what they mean.</p>
+
+<h3>The Objection Iceberg</h3>
+<p>What they say is the tip. What they feel is the 90% below the surface:</p>
+<ul>
+<li><strong>"I need to think about it"</strong> → Usually: "I'm not convinced enough" or "I'm scared to commit" or "I need permission from someone"</li>
+<li><strong>"It's too expensive"</strong> → Often: "I don't see enough value" or "I can't afford it but don't want to admit it" or "I need to feel justified"</li>
+<li><strong>"I need to talk to my spouse"</strong> → Sometimes real, but often: "I need a reason to leave without feeling pressured"</li>
+<li><strong>"I want to do more research"</strong> → Usually: "I don't trust this enough yet" or "Something feels off that I can't articulate"</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Client: "I want to think about it."<br>
+❌ Wrong: "What's there to think about?" (confrontational)<br>
+❌ Wrong: "Sure, take your time!" (you lose them)<br>
+✅ Right: "Absolutely — this is a decision worth thinking through. Help me understand: is there something specific you want to research more, or is it more about making sure the timing and investment feel right?" <br><br>
+This gently probes the REAL objection without being pushy.</p></div>
+
+<h3>The Onion Method</h3>
+<p>Peel back layers gently: "Is it the timing, the treatment itself, or the investment?" → They pick one → "And with the investment, is it about the total amount or more about finding the right payment structure?" → Now you're at the real issue and can address it.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>The magic question: <strong>"What would need to be true for you to feel great about moving forward today?"</strong> This skips all the layers and asks them to tell you exactly what they need to hear.</p></div>
+`,
+quiz:[
+{q:'When a client says "I need to think about it," what\'s MOST likely happening?',opts:['They genuinely need time','They\'re not convinced enough, scared to commit, or need someone else\'s approval','They want a discount','They\'re comparing other clinics'],correct:1,explain:'"Think about it" is the #1 polite exit. It usually masks uncertainty, fear, or a need for external validation — not an actual desire for thinking time.'},
+{q:'What\'s wrong with responding "Sure, take your time!" to an objection?',opts:['Nothing — it\'s polite','It\'s rude','You lose the opportunity to discover the real barrier while they\'re still in front of you','It shows weakness'],correct:2,explain:'Once they leave, the emotional connection fades, life gets busy, and they rationalize not coming back. Your best chance to address the real concern is now.'},
+{q:'What is the "magic question" for cutting through objection layers?',opts:['"What would it take to buy today?"','"What would need to be true for you to feel great about moving forward?"','"Don\'t you want beautiful skin?"','"What\'s really holding you back?"'],correct:1,explain:'This question is non-confrontational and empowering — it asks them to design their own "yes conditions" instead of you guessing what they are.'},
+{q:'What is the "Onion Method"?',opts:['Making clients cry','Layering multiple closes','Peeling back objection layers by narrowing categories until you reach the real issue','Adding complexity to the pitch'],correct:2,explain:'Category → subcategory → specific issue. "Is it timing, treatment, or investment?" → "Is it the total amount or the payment structure?" → Now you can solve the actual problem.'}
+]},
+
+{
+id:'hidden-objections',cat:'Objection Psychology',icon:'🎭',title:'Hidden Objections: Reading Between the Lines',time:3,
+content:`
+<p>The most dangerous objections are the ones <strong>never spoken aloud</strong>. A client might smile, nod along, and leave with a "Let me think about it" — while the real issue (fear, distrust, spousal concern, body image anxiety) was never addressed because it was never expressed.</p>
+
+<h3>Common Hidden Objections</h3>
+<ul>
+<li><strong>"I don't deserve this"</strong> — Guilt about spending on themselves. Common in parents, especially moms. → Reframe as self-care investment, not indulgence.</li>
+<li><strong>"What if it doesn't work on me?"</strong> — Fear of being the exception. → Address with guarantees, specificity for their case, before/afters of similar clients.</li>
+<li><strong>"What will people think?"</strong> — Fear of judgment for cosmetic treatments. → Normalize: "You'd be surprised how many people in your age group are doing this."</li>
+<li><strong>"I've been burned before"</strong> — Past bad experience creates deep skepticism. → Acknowledge it, differentiate your approach, offer low-risk starting points.</li>
+<li><strong>"My partner won't approve"</strong> — Financial or relationship dynamics. → "Would it help if we put together the information for you to share at home?"</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>When you sense a hidden objection, use the <strong>Permission Technique</strong>: "A lot of my clients initially wonder whether [hidden concern]. Is that something that's crossed your mind at all?" <br><br>
+"A lot of my clients initially felt nervous about investing in themselves — like maybe they should wait or spend the money on something more 'practical.' Is that something you've thought about?" <br><br>
+By normalizing it first, you give them permission to admit the real concern.</p></div>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>Watch for <strong>incongruence</strong>: words say yes but body says no. If their verbal and nonverbal signals don't match, there's a hidden objection. Gently name what you see: "I want to make sure I'm addressing everything — you seem like you might have another question?"</p></div>
+`,
+quiz:[
+{q:'What is the "Permission Technique" for hidden objections?',opts:['Asking permission to continue the pitch','Normalizing the concern first so the client feels safe admitting it','Getting permission from their spouse','Asking if you can give your honest opinion'],correct:1,explain:'"A lot of my clients wonder about [concern]..." normalizes it, removing shame/embarrassment, and gives them psychological permission to be honest.'},
+{q:'What should you watch for to detect hidden objections?',opts:['What they say about competitors','Incongruence between verbal and nonverbal signals','How quickly they respond','Whether they ask about pricing'],correct:1,explain:'When words and body language don\'t match (saying "Sounds great!" while leaning away with crossed arms), there\'s something unspoken. Name it gently.'},
+{q:'A client who\'s a mom seems interested but keeps hesitating. The hidden objection might be:',opts:['The treatment won\'t work','She thinks it\'s too expensive','Guilt about spending money on herself instead of her family','She doesn\'t like the clinic'],correct:2,explain:'"I don\'t deserve this" is incredibly common among parents. Reframe: this is self-care that makes you a better version of yourself — not a selfish indulgence.'}
+]},
+
+// BONUS LESSONS
+{
+id:'emotional-selling',cat:'Dark Psychology',icon:'🧲',title:'Emotional Selling: Logic Justifies, Emotion Decides',time:3,
+content:`
+<p>Here's the truth that transforms your close rate: <strong>people make decisions emotionally, then rationalize them logically</strong>. Neuroscience has confirmed this — patients with damaged emotional centers can't make decisions at all, even when their logic is perfectly intact.</p>
+
+<h3>The Decision Sequence</h3>
+<p>1. Emotional trigger ("I want this") → 2. Logical justification ("Here's why it makes sense") → 3. Action ("Let's do it")</p>
+<p>Most salespeople skip to step 2. They present features, facts, and figures — and wonder why the client says "Let me think about it." You can't logic someone into a decision they don't feel.</p>
+
+<h3>Emotional Triggers</h3>
+<ul>
+<li><strong>Identity</strong> — "This is who I want to be" (most powerful)</li>
+<li><strong>Fear of missing out</strong> — "Everyone else already..."</li>
+<li><strong>Pain avoidance</strong> — "I'm tired of dealing with..."</li>
+<li><strong>Status</strong> — "This signals success/beauty/confidence"</li>
+<li><strong>Belonging</strong> — "People I admire do this"</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>❌ Logical pitch: "Our laser uses 810nm diode wavelength, targeting melanin in the hair follicle across 6-8 sessions."<br><br>
+✅ Emotional pitch: "Imagine waking up tomorrow and just... not having to think about it. No razor burn, no ingrown hairs, no scheduling waxing appointments. Just smooth skin, every day, without any effort. How would that feel?"<br><br>
+THEN the logic: "The technology is the most advanced available — here's why it actually delivers that result..."<br><br>
+Emotion first, logic second. Always.</p></div>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p><strong>Future pacing</strong> is the strongest emotional tool: transport them to the future where they already have the result. "It's June. You're getting ready for the beach. You don't even think about it..." When they emotionally experience the outcome, the purchase becomes the path to something they already "have."</p></div>
+`,
+quiz:[
+{q:'What does neuroscience say about decision-making?',opts:['Logic drives all decisions','Emotions and logic contribute equally','People decide emotionally first, then justify logically','Emotions cloud good judgment'],correct:2,explain:'Research (Damasio) shows patients with damaged emotional centers can\'t decide at all — emotion is literally required for decision-making, not an obstacle to it.'},
+{q:'What is "future pacing"?',opts:['Speeding up the consultation','Walking quickly with the client','Helping the client emotionally experience the future result before buying','Setting future appointments'],correct:2,explain:'Future pacing transports them emotionally to the outcome. Once they "feel" the result, the purchase becomes the bridge to something they already own in their mind.'},
+{q:'Why do feature-heavy pitches often fail?',opts:['Features are unimportant','They skip the emotional trigger that actually initiates the decision process','Clients can\'t understand features','Features are boring'],correct:1,explain:'Logic can\'t start a decision — only justify one. Without an emotional trigger first, all those features have nowhere to land.'},
+{q:'Which emotional trigger is generally the MOST powerful?',opts:['Fear','Status','Identity ("This is who I want to be")','Belonging'],correct:2,explain:'Identity-level motivation is the deepest. When a purchase aligns with who someone wants to be (not just what they want to have), it becomes almost inevitable.'}
+]},
+
+{
+id:'pre-suasion',cat:'Dark Psychology',icon:'🌊',title:'Pre-suasion: Win Before You Start',time:2,
+content:`
+<p>The most important moment of persuasion isn't the pitch — it's what happens <strong>before</strong> the pitch. Pre-suasion (Robert Cialdini's concept) is about creating the right mental environment so your message lands on fertile ground.</p>
+
+<h3>The Principle</h3>
+<p>What people are paying attention to in the moment BEFORE your message shapes how they receive it. Prime the right concept, and your pitch practically sells itself.</p>
+
+<h3>Pre-suasion Techniques</h3>
+<ul>
+<li><strong>Environment priming</strong> — Luxury cues (nice lobby, clean space, premium materials) prime people to accept premium pricing</li>
+<li><strong>Question priming</strong> — "How important is it to you to feel confident about your skin?" → Now "confidence" is activated, and your treatment = confidence</li>
+<li><strong>Agreement priming</strong> — Start with questions they'll say "yes" to. Three yeses before your ask.</li>
+<li><strong>Identity priming</strong> — "You seem like someone who really invests in themselves" → now they'll act consistently with that identity</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>Before discussing treatment: "I'm curious — what made you decide to come in today? What's the one thing you'd love to change?" <br><br>
+This does three things: (1) They articulate their own pain point (ownership), (2) They've now primed themselves with their own motivation, and (3) Everything you say after connects directly to THEIR stated desire. They've pre-persuaded themselves.</p></div>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>The most powerful pre-suasion? <strong>Get them to sell themselves.</strong> Ask "why" questions: "Why now?" "Why is this important to you?" Every answer strengthens their own commitment.</p></div>
+`,
+quiz:[
+{q:'What is pre-suasion?',opts:['A special type of pressure tactic','Shaping the mental environment before the actual persuasion attempt','Persuading people before meeting them','Pre-written sales scripts'],correct:1,explain:'Pre-suasion is about what happens BEFORE the pitch. The right mental priming makes the actual message land much more effectively.'},
+{q:'Why is asking "What made you decide to come in today?" so powerful?',opts:['It\'s polite small talk','It gets them to articulate their own motivation, priming themselves for the solution','It helps you understand their skin type','It fills silence'],correct:1,explain:'When they state their own reasons for being there, they\'ve (1) committed to those reasons, (2) primed themselves with their pain/desire, and (3) given you their exact selling angle.'},
+{q:'How does a premium environment aid pre-suasion?',opts:['It impresses clients','It\'s just decoration','Luxury cues prime the brain to expect and accept premium pricing','It distracts from the price'],correct:2,explain:'Environmental priming is real — studies show that luxury cues (nice lobby, premium materials) actually shift people\'s acceptable price range upward before any conversation.'}
+]},
+
+{
+id:'objection-aikido',cat:'Objection Psychology',icon:'🥋',title:'Objection Aikido: Use Their Force, Not Yours',time:3,
+content:`
+<p>In aikido, you <strong>redirect your opponent's energy</strong> rather than meeting it head-on. Objection handling works the same way. Don't fight the objection — absorb it, redirect it, and use its momentum to close.</p>
+
+<h3>The LAER Framework</h3>
+<ul>
+<li><strong>L — Listen</strong> fully. Don't interrupt. Let them finish. The objection often softens just by being heard.</li>
+<li><strong>A — Acknowledge</strong> "That makes total sense" / "I appreciate you being honest about that"</li>
+<li><strong>E — Explore</strong> "Help me understand — is it more about X or Y?" Get to the real issue.</li>
+<li><strong>R — Respond</strong> Only now, with the real objection identified, give your targeted response.</li>
+</ul>
+
+<div class="example"><div class="label">LaserAway Application</div>
+<p>"I need to talk to my husband."<br><br>
+<strong>L:</strong> *Listen, nod, wait for them to finish*<br>
+<strong>A:</strong> "That makes a lot of sense — it's a decision that affects both of you."<br>
+<strong>E:</strong> "When you talk to him, what do you think his main concern will be — the investment, or something else?"<br>
+<strong>R:</strong> (If cost) "Would it help if I put together a comparison showing the long-term savings? That way you have something concrete to discuss."<br><br>
+You've turned a walkaway into a partnership — you're now on their team, helping them close the deal at home.</p></div>
+
+<h3>The "Feel, Felt, Found" Classic</h3>
+<p>"I understand how you feel. Other clients have felt the same way. What they found was..." It's old-school but it works because it validates (feel), normalizes (felt), and resolves (found) in one smooth motion.</p>
+
+<div class="tip"><div class="label">Pro Tip</div>
+<p>The most powerful response to any objection is a question, not an answer. Questions keep the conversation going and give you more information. Answers can feel like arguments.</p></div>
+`,
+quiz:[
+{q:'What does the "L" in LAER stand for and why is it first?',opts:['Lead — take control immediately','Listen — fully hear the objection before responding, which often softens it','Look — observe their body language','Leverage — find their weakness'],correct:1,explain:'Listening is first because people need to feel heard before they\'ll hear you. Plus, the act of fully expressing an objection often reduces its emotional intensity.'},
+{q:'Why is a question often better than an answer when handling objections?',opts:['Questions buy time','Questions keep the conversation going and reveal the real issue; answers can feel like arguments','It\'s more polite','Questions are easier'],correct:1,explain:'An answer to a surface objection might miss the real issue entirely. A question explores deeper, gets more data, and keeps them engaged rather than defensive.'},
+{q:'In "Feel, Felt, Found" — what does the "Felt" component do?',opts:['Validates their emotion','Normalizes their concern by showing others had the same reaction','Presents the solution','Builds urgency'],correct:1,explain:'"Others felt the same way" normalizes their concern. They\'re not weird, wrong, or alone — which removes defensiveness and opens them to the "found" (resolution).'}
+]},
+];
+
+// ==================== SCENARIOS ====================
+const SCENARIOS = [
+{
+situation:'You\'ve just finished presenting a laser hair removal package. The client has been engaged and asking good questions throughout.',
+client:'I need to think about it.',
+options:[
+{text:'Absolutely — take all the time you need! Here\'s my card.',rating:'bad',explain:'You\'ve just given them permission to leave and never come back. Once they walk out, life happens and the emotional connection fades. You missed your chance to discover the real objection.'},
+{text:'"Totally understand — it\'s worth thinking through. Help me understand: is there something specific you want to research more, or is it more about making sure the timing and investment feel right?"',rating:'best',explain:'This validates them (pacing) then gently probes the real objection (leading). You\'re not being pushy — you\'re being helpful. Most "think about it" objections dissolve when you identify what\'s actually underneath.'},
+{text:'"What\'s there to think about? This is the best deal we\'ve had all year!"',rating:'bad',explain:'Confrontational and dismissive. This increases resistance and makes them feel pressured. You\'ve turned a potential conversation into a power struggle.'},
+{text:'"I want to make sure you have everything you need. If I could address one more concern right now, what would it be?"',rating:'ok',explain:'Good instinct — you\'re probing for the real objection. It\'s slightly direct, which works for some people but might feel pushy to others. The "best" answer achieves the same thing more gently.'},
+]},
+{
+situation:'A client is interested in body contouring but keeps glancing at the price sheet with a worried expression.',
+client:'It\'s just... that\'s more than I expected.',
+options:[
+{text:'"I hear you — and honestly, I felt the same way when I first looked at pricing in this space. What most clients find is that when you break it down per session, it\'s actually less than what they spend on temporary solutions each month. Would it help to look at it that way?"',rating:'best',explain:'Feel-Felt-Found + reframing. You validated the emotion, normalized it, and offered a new perspective (per-unit reframing) without being dismissive. The question at the end keeps them engaged.'},
+{text:'"We have payment plans available."',rating:'ok',explain:'Solves a practical problem, but skips the emotional acknowledgment. If the real issue is perceived value (not cash flow), this doesn\'t help. Always validate first, then solve.'},
+{text:'"You get what you pay for — cheap treatments give cheap results."',rating:'bad',explain:'Condescending and defensive. Even if it\'s true, it makes the client feel judged for their concern. You\'ve just lost rapport and possibly the sale.'},
+{text:'"What if I check with my manager about getting you a better rate?"',rating:'ok',explain:'Sometimes necessary, but jumping to discount signals that your pricing wasn\'t justified in the first place. Try reframing value before reducing price. Discounting should be a last resort, not a first response.'},
+]},
+{
+situation:'You\'re consulting with a woman in her 30s about facial treatments. She seems interested but keeps pulling back.',
+client:'I don\'t know... my husband might think it\'s too much for something cosmetic.',
+options:[
+{text:'"A lot of my clients initially felt the same way. What they found helpful was framing it as a long-term investment in self-care rather than a one-time cosmetic expense. Would it help if I put together a simple overview you could share with him?"',rating:'best',explain:'Normalizes the concern (social proof), reframes from "cosmetic" to "self-care investment" (meaning reframe), and offers practical help for her specific situation. You\'re now her ally, not her adversary.'},
+{text:'"This is YOUR decision, not his."',rating:'bad',explain:'Even if you believe this, it\'s not your place. You\'re inserting yourself into their relationship dynamic, which will make her defensive. Respect the partnership while still serving your client.'},
+{text:'"I understand. Why don\'t you bring him in next time so I can explain the benefits?"',rating:'ok',explain:'Not bad — involving the decision-maker can work. But it delays the sale and you might never see them again. Better to equip HER to have the conversation confidently.'},
+{text:'"What do you think his main concern would be — the cost, or the idea of cosmetic treatment in general?"',rating:'ok',explain:'Good diagnostic question (Onion Method). This identifies whether it\'s a financial or cultural/identity objection. But it would be stronger if you validated her concern first.'},
+]},
+{
+situation:'A young professional has been very enthusiastic about laser hair removal during the consultation but freezes when you present the treatment plan.',
+client:'Can I just start with one session to try it out?',
+options:[
+{text:'"I totally get wanting to test the waters. Here\'s what I want to be upfront about: one session will show you the experience, but you won\'t see the full results because the hair grows in cycles. Most clients who start with one session end up wishing they\'d started the package — because the per-session rate is significantly better. What if we locked in the package rate but I walk you through exactly what to expect at each session?"',rating:'best',explain:'Validates their caution (pacing), provides honest education (authority), uses loss-framing on per-session pricing (loss aversion), and offers a path forward that addresses their need for control. Honest + helpful + closing.'},
+{text:'"Sure! One session is $X."',rating:'ok',explain:'You\'ll make a small sale but lose the big one. And after one session with incomplete results, they might conclude it doesn\'t work. You\'ve also anchored low — making the package feel even more expensive later.'},
+{text:'"One session won\'t show results. You need the full package."',rating:'bad',explain:'Even though it\'s true, it feels dismissive of their concern and pushy. You\'re telling them they\'re wrong instead of educating them respectfully.'},
+{text:'"What if I could offer you 2 sessions at a reduced rate to get started?"',rating:'ok',explain:'Better than one, still not ideal. You\'re discounting without reframing value. And 2 sessions still won\'t show full results. Address the underlying concern (fear of commitment) rather than just shrinking the ask.'},
+]},
+{
+situation:'You\'re wrapping up a consultation for skin rejuvenation. The client loved everything but seems to be stalling.',
+client:'This all sounds amazing. Let me go home and look at my calendar.',
+options:[
+{text:'"Of course! Before you go, I should mention that the promotional pricing on this package ends this Friday. I don\'t want you to come back ready to go and find out the price has changed. Would it make sense to lock in the rate now and we can always adjust the schedule?"',rating:'best',explain:'Scarcity (real deadline) + loss aversion (price might change) + a solution that removes their stated concern (calendar flexibility). You\'re being helpful, not pushy — giving them a reason to act now that serves THEIR interests.'},
+{text:'"Sounds good! I\'ll send you a follow-up email."',rating:'bad',explain:'You just let a hot lead walk out the door. Follow-up emails have terrible conversion rates compared to closing in-person. At minimum, you should probe what\'s behind the stall.'},
+{text:'"Let\'s pull up the calendar right now — I can show you available times and we can find something that works."',rating:'ok',explain:'Proactive and efficient — addresses the stated objection directly. But if "calendar" was just a polite excuse, this might feel pushy. It\'s better to briefly probe whether it\'s really about scheduling first.'},
+{text:'"I know scheduling can be tricky. What\'s your biggest constraint — weekday availability or finding a specific time slot?"',rating:'ok',explain:'Good diagnostic question to test whether the calendar objection is real. If they can\'t answer specifically, it was probably an excuse — and now you can gently explore what\'s really going on.'},
+]},
+{
+situation:'A client is comparing your services to a cheaper competitor across town.',
+client:'The place down the street quoted me $500 less for the same thing.',
+options:[
+{text:'"That\'s good to know. Can I ask — what technology are they using? Because a lot of clinics use older machines that require more sessions for the same results. When you factor in the extra sessions, the total cost often ends up the same or higher. Our [technology name] typically achieves results in fewer sessions. Would you like me to break down the total cost comparison?"',rating:'best',explain:'You didn\'t trash the competitor (stays classy). You reframed from per-session to total cost (anchoring + framing), established authority by asking about technology, and offered proof. The question at the end maintains dialogue.'},
+{text:'"You get what you pay for."',rating:'bad',explain:'Cliché, dismissive, and sounds defensive. It doesn\'t actually address their concern or give them any information to justify your pricing.'},
+{text:'"We can match that price."',rating:'bad',explain:'Price matching destroys your value proposition. If you can sell it for less, why didn\'t you? Now they wonder what else is negotiable. And you\'ve trained them to always shop for lower prices.'},
+{text:'"We\'re a national brand with board-certified providers — there\'s a reason for the difference."',rating:'ok',explain:'Uses authority positioning, which is good. But it\'s a bit vague and doesn\'t directly address their cost concern. Better to get specific about WHY the price difference exists in terms of results and total investment.'},
+]},
+{
+situation:'A client finished their first consultation and seems genuinely happy with the information.',
+client:'This is great! I\'m definitely interested. I just want to sleep on it — I never make big decisions on the spot.',
+options:[
+{text:'"I respect that — sleeping on a decision is smart. Most of my best clients are the careful ones. Quick question before you head out: on a scale of 1-10, how excited are you about the treatment itself?" [If 7+] "That\'s great. So the treatment is a yes — it\'s really just about making sure the timing feels right. What if we reserved a spot at the current rate with our 48-hour cancellation policy? That way you sleep on it without risking the price change, and you can cancel with zero pressure if you wake up and it doesn\'t feel right."',rating:'best',explain:'Masterful sequence: validates their process, compliments their style (liking), uses a micro-commitment (1-10 scale) to isolate the real concern, then offers a zero-risk way to commit. The cancellation policy removes the fear of regret.'},
+{text:'"No problem at all! I\'ll be here whenever you\'re ready."',rating:'bad',explain:'Feels nice, converts poorly. You\'ve given them no reason to come back and no mechanism to maintain the connection. Most "I\'ll come back" clients don\'t.'},
+{text:'"Totally understand. Just so you know, prices go up next month."',rating:'ok',explain:'Uses scarcity, which is fine if true. But it feels a bit pressuring after they just told you they don\'t make big decisions quickly. Would work better combined with a low-risk option.'},
+{text:'"What would help you feel more confident about the decision?"',rating:'ok',explain:'Good question — directly asks for the real barrier. Could feel slightly confrontational to someone who just said they need time. The best answer achieves the same insight more smoothly.'},
+]},
+{
+situation:'During a consultation, you notice the client keeps checking their phone and giving short answers.',
+client:'Yeah, uh huh, sounds good... how much is it?',
+options:[
+{text:'"Before I get to pricing — I want to make sure I\'m covering what matters most to you. We\'ve been going through a lot of info. What\'s the ONE thing that would make the biggest difference for you?"',rating:'best',explain:'You\'ve recognized that you\'ve lost their attention and pivoted immediately. Instead of plowing through your script, you re-engaged by making it about them. The ONE thing question forces focus and reveals their priority. Now you can tailor everything to that.'},
+{text:'Continue with the full presentation, then give the price at the end.',rating:'bad',explain:'They\'re already checked out. More information will push them further away, not closer. Reading the room is a critical skill — this is a moment to adapt, not persist.'},
+{text:'"The total for the package is $X."',rating:'ok',explain:'Giving the price when asked is fine, but without emotional investment, it\'ll sound like "a lot." You\'ve skipped the emotional selling entirely. Price without context = sticker shock.'},
+{text:'"I can see you\'re busy — want me to send you the details and we can schedule a call?"',rating:'ok',explain:'Acknowledges their state, which shows awareness. But you\'re letting a warm lead cool off. Better to re-engage in the moment if possible.'},
+]},
+{
+situation:'A repeat client is considering an upgrade to a more comprehensive treatment package.',
+client:'I loved my last results, but this new package is double the price. Is it really worth it?',
+options:[
+{text:'"I\'m glad you loved the results — that actually tells me a lot. Here\'s the honest breakdown: the base package got you about 70% of the way there. This upgrade targets the remaining 30%, which is often where the most visible difference is. It\'s like going from good to \'people-notice.\' Given how happy you were with the first round, how would you feel about results that are even more dramatic?"',rating:'best',explain:'Anchors on their positive experience (commitment), uses honest metrics (authority), reframes the upgrade from "costs double" to "gets the dramatic results" (framing), and ends with a future-pacing question (emotional selling). Layered and natural.'},
+{text:'"Absolutely, the results speak for themselves."',rating:'ok',explain:'Vague reassurance. They asked a specific question about whether double the price is worth it — give them a specific, honest answer. General positivity doesn\'t address the value concern.'},
+{text:'"If you\'re not sure, you could just repeat the same package."',rating:'bad',explain:'You just talked them OUT of the upgrade. They were on the fence and you pushed them toward the cheaper option. Always explore the "yes" before offering the "no."'},
+{text:'"Think about it this way — per session, the cost is only $X more."',rating:'ok',explain:'Per-unit reframing is good, but it\'s only one tool. The best answer layers multiple techniques. Starting with their positive past experience and building from there is more persuasive.'},
+]},
+{
+situation:'A potential client came in with a friend. The friend has been making skeptical comments throughout the consultation.',
+client:'I don\'t know... [Friend]: "You can get this done way cheaper online with an at-home device."',
+options:[
+{text:'"That\'s a great point — at-home devices have gotten a lot better. The main difference is power level: medical-grade devices operate at wavelengths and intensities that aren\'t available for home use, which is why they deliver permanent results in fewer sessions. At-home devices are great for maintenance between professional treatments though. [To the client]: What would be most helpful — should I explain the technology difference, or would you rather see some before-and-afters?"',rating:'best',explain:'Acknowledges the friend (doesn\'t dismiss or antagonize), educates without being condescending, pivots back to the client, and offers a choice (engagement). You\'ve turned the friend\'s objection into an authority-building moment while keeping the client in the driver\'s seat.'},
+{text:'"Those devices don\'t actually work."',rating:'bad',explain:'You\'ve just told the friend they\'re wrong in front of your client. Even if it\'s mostly true, you\'ve created an adversarial dynamic. The friend will dig in, and the client is stuck between you.'},
+{text:'Ignore the friend and keep talking to the client.',rating:'bad',explain:'The friend is influencing the decision. Ignoring them doesn\'t make them go away — it makes them feel disrespected and more likely to talk the client out of it after you leave.'},
+{text:'"Home devices can help with some things, but for permanent results you need professional treatment."',rating:'ok',explain:'Partially validates, then differentiates. It\'s fine but generic. The best answer goes deeper into specifics (wavelength, power level) which builds more authority and is harder to argue with.'},
+]},
+];
+
+// ==================== APP STATE ====================
+const LS_KEY = 'influence_academy_v2';
+let state = loadState();
+
+function defaultState(){
+return {
+completed:{},quizScores:{},streak:0,lastVisit:null,
+scenariosCompleted:{},dailyLessonIndex:0,lastDailyDate:null,
+reviewQueue:[],quizHistory:[]
+};
+}
+
+function loadState(){
+try{const s=localStorage.getItem(LS_KEY);return s?{...defaultState(),...JSON.parse(s)}:defaultState();}
+catch(e){return defaultState();}
+}
+
+function saveState(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
+
+function getToday(){return new Date().toISOString().split('T')[0];}
+
+function updateStreak(){
+const today=getToday();
+if(state.lastVisit===today)return;
+const yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);
+const yd=yesterday.toISOString().split('T')[0];
+if(state.lastVisit===yd){state.streak++;}
+else if(state.lastVisit!==today){state.streak=1;}
+state.lastVisit=today;
+saveState();
+}
+
+function getDailyLesson(){
+const today=getToday();
+if(state.lastDailyDate!==today){
+const incomplete=LESSONS.filter(l=>!state.completed[l.id]);
+if(incomplete.length>0){
+const dayNum=Math.floor(Date.now()/86400000);
+state.dailyLessonIndex=dayNum%LESSONS.length;
+let attempts=0;
+while(state.completed[LESSONS[state.dailyLessonIndex].id]&&attempts<LESSONS.length){
+state.dailyLessonIndex=(state.dailyLessonIndex+1)%LESSONS.length;
+attempts++;
+}
+}
+state.lastDailyDate=today;
+saveState();
+}
+return LESSONS[state.dailyLessonIndex];
+}
+
+function getReviewLessons(){
+const reviews=[];const now=Date.now();
+for(const id in state.quizScores){
+const s=state.quizScores[id];
+if(!s||!s.lastTaken)continue;
+const score=s.correct/s.total;
+let interval;
+if(score>=0.8)interval=7*86400000;
+else if(score>=0.6)interval=3*86400000;
+else interval=1*86400000;
+if(now-s.lastTaken>interval){
+const lesson=LESSONS.find(l=>l.id===id);
+if(lesson)reviews.push(lesson);
+}
+}
+return reviews;
+}
+
+// ==================== VIEWS ====================
+function showView(name){
+document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+const btn=document.querySelector(`[data-view="${name}"]`);
+if(btn)btn.classList.add('active');
+
+if(name==='today')renderToday();
+else if(name==='library')renderLibrary();
+else if(name==='scenarios')renderScenarios();
+else if(name==='dashboard')renderDashboard();
+
+document.getElementById(name+'View').classList.add('active');
+window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderToday(){
+const daily=getDailyLesson();
+const reviews=getReviewLessons();
+const completedCount=Object.keys(state.completed).length;
+const totalLessons=LESSONS.length;
+
+let html=`<div class="daily-hero" onclick="openLesson('${daily.id}')">
+<div class="label">📅 Today's Lesson</div>
+<h2>${daily.icon} ${daily.title}</h2>
+<p>${daily.cat} · ${daily.time} min read</p>
+</div>`;
+
+if(reviews.length>0){
+html+=`<div class="review-banner" onclick="openLesson('${reviews[0].id}')">
+<div class="icon">🔄</div>
+<div class="info">
+<h3>${reviews.length} lesson${reviews.length>1?'s':''} due for review</h3>
+<p>Spaced repetition keeps knowledge fresh — tap to review</p>
+</div>
+</div>`;
+}
+
+html+=`<div class="section-title">📈 Your Progress</div>
+<div class="stats-grid">
+<div class="stat-card"><div class="num">${completedCount}/${totalLessons}</div><div class="label">Lessons Done</div></div>
+<div class="stat-card"><div class="num">${getAvgScore()}%</div><div class="label">Avg Quiz Score</div></div>
+<div class="stat-card"><div class="num">${state.streak}</div><div class="label">Day Streak</div></div>
+<div class="stat-card"><div class="num">${Object.keys(state.scenariosCompleted).length}/${SCENARIOS.length}</div><div class="label">Scenarios</div></div>
+</div>
+<div class="progress-bar"><div class="progress-fill" style="width:${(completedCount/totalLessons*100)}%"></div></div>
+<p style="text-align:center;color:var(--text-dim);font-size:0.85em;margin-top:8px">${Math.round(completedCount/totalLessons*100)}% complete</p>`;
+
+// Recent incomplete
+const incomplete=LESSONS.filter(l=>!state.completed[l.id]).slice(0,3);
+if(incomplete.length>0){
+html+=`<div class="section-title" style="margin-top:30px">🎯 Up Next</div>`;
+incomplete.forEach(l=>{
+html+=lessonCard(l);
+});
+}
+
+document.getElementById('todayView').innerHTML=html;
+}
+
+function renderLibrary(filterCat=null){
+const cats=[...new Set(LESSONS.map(l=>l.cat))];
+let html=`<div class="cat-filters">
+<div class="cat-pill ${!filterCat?'active':''}" onclick="renderLibrary();document.getElementById('libraryView').classList.add('active')">All</div>`;
+cats.forEach(c=>{
+html+=`<div class="cat-pill ${filterCat===c?'active':''}" onclick="renderLibrary('${c}');document.getElementById('libraryView').classList.add('active')">${c}</div>`;
+});
+html+=`</div>`;
+
+const filtered=filterCat?LESSONS.filter(l=>l.cat===filterCat):LESSONS;
+filtered.forEach(l=>{html+=lessonCard(l);});
+
+document.getElementById('libraryView').innerHTML=html;
+}
+
+function lessonCard(l){
+const done=state.completed[l.id];
+const review=getReviewLessons().find(r=>r.id===l.id);
+const score=state.quizScores[l.id];
+let badge='';
+if(review)badge=`<div class="card-badge badge-review">Review Due</div>`;
+else if(done)badge=`<div class="card-badge badge-complete">✓ Complete</div>`;
+else badge=`<div class="card-badge badge-new">New</div>`;
+
+let meta=`<span>📖 ${l.time} min</span><span>📁 ${l.cat}</span>`;
+if(score)meta+=`<span>📝 ${Math.round(score.correct/score.total*100)}%</span>`;
+
+return `<div class="card" onclick="openLesson('${l.id}')">
+${badge}
+<div class="card-cat">${l.cat}</div>
+<div class="card-title">${l.icon} ${l.title}</div>
+<div class="card-meta">${meta}</div>
+</div>`;
+}
+
+function openLesson(id){
+const lesson=LESSONS.find(l=>l.id===id);
+if(!lesson)return;
+
+document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+const lv=document.getElementById('lessonView');
+lv.classList.add('active');
+
+let html=`<div class="lesson-view">
+<div class="lesson-back" onclick="showView('${document.querySelector('.nav-btn.active')?.dataset.view||'today'}')">← Back</div>
+<div class="lesson-header">
+<div class="cat">${lesson.cat}</div>
+<h2>${lesson.icon} ${lesson.title}</h2>
+<div style="color:var(--text-dim);font-size:0.85em;margin-top:4px">📖 ${lesson.time} min read · ${lesson.quiz.length} quiz questions</div>
+</div>
+<div class="lesson-content">${lesson.content}</div>
+<div class="lesson-actions">
+<button class="btn btn-primary" onclick="startQuiz('${lesson.id}')">📝 Take Quiz</button>
+${!state.completed[lesson.id]?`<button class="btn btn-success" onclick="markComplete('${lesson.id}')">✓ Mark as Read</button>`:''}
+</div>
+<div id="quizContainer"></div>
+</div>`;
+
+lv.innerHTML=html;
+window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function markComplete(id){
+state.completed[id]=Date.now();
+saveState();
+openLesson(id);
+}
+
+// ==================== QUIZ ====================
+let currentQuiz=null;
+
+function startQuiz(lessonId){
+const lesson=LESSONS.find(l=>l.id===lessonId);
+if(!lesson)return;
+currentQuiz={lessonId,questions:lesson.quiz,current:0,correct:0,answers:[]};
+renderQuiz();
+document.getElementById('quizContainer').scrollIntoView({behavior:'smooth'});
+}
+
+function renderQuiz(){
+const q=currentQuiz;
+if(!q)return;
+const container=document.getElementById('quizContainer');
+
+if(q.current>=q.questions.length){
+const pct=Math.round(q.correct/q.questions.length*100);
+state.quizScores[q.lessonId]={correct:q.correct,total:q.questions.length,lastTaken:Date.now()};
+if(!state.completed[q.lessonId])state.completed[q.lessonId]=Date.now();
+state.quizHistory.push({lessonId:q.lessonId,score:pct,date:getToday()});
+saveState();
+
+let msg,emoji;
+if(pct>=80){msg='Excellent! You\'ve mastered this material.';emoji='🏆';}
+else if(pct>=60){msg='Good work! Review the lesson to strengthen weak areas.';emoji='👍';}
+else{msg='Keep studying — this material will click with practice.';emoji='📚';}
+
+container.innerHTML=`<div class="quiz-container"><div class="quiz-result">
+<div style="font-size:3em;margin-bottom:10px">${emoji}</div>
+<div class="score">${pct}%</div>
+<div class="label">${q.correct}/${q.questions.length} correct</div>
+<p style="color:var(--text-dim);margin-top:16px;font-size:0.95em">${msg}</p>
+<div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+<button class="btn btn-primary" onclick="startQuiz('${q.lessonId}')">🔄 Retake Quiz</button>
+<button class="btn btn-secondary" onclick="showView('library')">📚 More Lessons</button>
+</div>
+</div></div>`;
+updateStreak();
+return;
+}
+
+const question=q.questions[q.current];
+let dots='<div class="quiz-progress">';
+for(let i=0;i<q.questions.length;i++){
+let cls='quiz-dot';
+if(i===q.current)cls+=' current';
+else if(i<q.current)cls+=q.answers[i]?' correct':' wrong';
+dots+=`<div class="${cls}"></div>`;
+}
+dots+='</div>';
+
+let opts='';
+question.opts.forEach((o,i)=>{
+opts+=`<button class="quiz-option" onclick="answerQuiz(${i})" id="qopt${i}">${o}</button>`;
+});
+
+container.innerHTML=`<div class="quiz-container">
+${dots}
+<div style="color:var(--text-dim);font-size:0.82em;margin-bottom:12px">Question ${q.current+1} of ${q.questions.length}</div>
+<div class="quiz-question">${question.q}</div>
+${opts}
+<div id="quizFeedback"></div>
+</div>`;
+}
+
+function answerQuiz(idx){
+const q=currentQuiz;
+const question=q.questions[q.current];
+const isCorrect=idx===question.correct;
+if(isCorrect)q.correct++;
+q.answers.push(isCorrect);
+
+document.querySelectorAll('.quiz-option').forEach((btn,i)=>{
+btn.classList.add('disabled');
+if(i===question.correct)btn.classList.add('correct');
+else if(i===idx&&!isCorrect)btn.classList.add('wrong');
+});
+
+document.getElementById('quizFeedback').innerHTML=`
+<div class="quiz-explanation">
+<strong>${isCorrect?'✅ Correct!':'❌ Not quite.'}</strong><br>${question.explain}
+</div>
+<button class="btn btn-primary" style="margin-top:16px" onclick="nextQuizQ()">
+${q.current+1<q.questions.length?'Next Question →':'See Results'}
+</button>`;
+}
+
+function nextQuizQ(){
+currentQuiz.current++;
+renderQuiz();
+document.getElementById('quizContainer').scrollIntoView({behavior:'smooth'});
+}
+
+// ==================== SCENARIOS ====================
+function renderScenarios(){
+let html=`<div class="section-title">🎭 Scenario Trainer</div>
+<p style="color:var(--text-dim);font-size:0.9em;margin-bottom:20px">Real-world situations. Pick the best psychological approach. Learn why each option works — or doesn't.</p>`;
+
+SCENARIOS.forEach((s,i)=>{
+const done=state.scenariosCompleted[i];
+html+=`<div class="card" onclick="openScenario(${i})">
+${done?'<div class="card-badge badge-complete">✓ Done</div>':'<div class="card-badge badge-new">Try It</div>'}
+<div class="card-title">Scenario ${i+1}</div>
+<div class="card-desc">${s.client.substring(0,80)}${s.client.length>80?'...':''}</div>
+</div>`;
+});
+
+document.getElementById('scenariosView').innerHTML=html;
+}
+
+function openScenario(idx){
+const s=SCENARIOS[idx];
+document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+const sv=document.getElementById('scenariosView');
+sv.classList.add('active');
+
+let optsHtml='';
+s.options.forEach((o,i)=>{
+optsHtml+=`<button class="scenario-option" id="sopt${i}" onclick="revealScenario(${idx},${i})">${o.text}</button>`;
+});
+
+sv.innerHTML=`<div class="lesson-view">
+<div class="lesson-back" onclick="showView('scenarios')">← Back to Scenarios</div>
+<div class="scenario-card">
+<div style="color:var(--accent-light);font-size:0.8em;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">Scenario ${idx+1} of ${SCENARIOS.length}</div>
+<div class="scenario-situation">${s.situation}</div>
+<div class="scenario-client">${s.client}</div>
+</div>
+<div class="section-title">What's your move?</div>
+<div id="scenarioOptions">${optsHtml}</div>
+<div id="scenarioFeedback"></div>
+</div>`;
+}
+
+function revealScenario(sIdx,chosen){
+const s=SCENARIOS[sIdx];
+state.scenariosCompleted[sIdx]=true;
+saveState();
+
+s.options.forEach((o,i)=>{
+const el=document.getElementById('sopt'+i);
+el.classList.add('revealed',o.rating);
+el.style.cursor='default';
+el.onclick=null;
+const fb=document.createElement('div');
+fb.className='scenario-feedback';
+fb.style.color=o.rating==='best'?'var(--success)':o.rating==='ok'?'var(--warning)':'var(--danger)';
+fb.style.background=o.rating==='best'?'#10b98111':o.rating==='ok'?'#f59e0b11':'#ef444411';
+const label=o.rating==='best'?'✅ Best Response':o.rating==='ok'?'⚠️ Okay, But...':'❌ Avoid This';
+fb.innerHTML=`<strong>${label}</strong><br>${o.explain}`;
+el.after(fb);
+});
+
+const next=sIdx+1<SCENARIOS.length?
+`<button class="btn btn-primary" style="margin-top:20px" onclick="openScenario(${sIdx+1})">Next Scenario →</button>`:
+`<button class="btn btn-success" style="margin-top:20px" onclick="showView('scenarios')">🏆 All Scenarios Complete!</button>`;
+document.getElementById('scenarioFeedback').innerHTML=next;
+}
+
+// ==================== DASHBOARD ====================
+function getAvgScore(){
+const scores=Object.values(state.quizScores);
+if(scores.length===0)return 0;
+const avg=scores.reduce((a,s)=>a+(s.correct/s.total),0)/scores.length*100;
+return Math.round(avg);
+}
+
+function renderDashboard(){
+const completedCount=Object.keys(state.completed).length;
+const totalLessons=LESSONS.length;
+const avgScore=getAvgScore();
+const totalQuizzes=Object.keys(state.quizScores).length;
+const scenariosDone=Object.keys(state.scenariosCompleted).length;
+
+let html=`<div class="section-title">📊 Progress Dashboard</div>
+<div class="stats-grid">
+<div class="stat-card"><div class="num">${completedCount}</div><div class="label">Lessons Completed</div></div>
+<div class="stat-card"><div class="num">${totalQuizzes}</div><div class="label">Quizzes Taken</div></div>
+<div class="stat-card"><div class="num">${avgScore}%</div><div class="label">Avg Quiz Score</div></div>
+<div class="stat-card"><div class="num">${state.streak}🔥</div><div class="label">Day Streak</div></div>
+<div class="stat-card"><div class="num">${scenariosDone}/${SCENARIOS.length}</div><div class="label">Scenarios Done</div></div>
+<div class="stat-card"><div class="num">${Math.round(completedCount/totalLessons*100)}%</div><div class="label">Overall Progress</div></div>
+</div>`;
+
+// Progress by category
+const cats=[...new Set(LESSONS.map(l=>l.cat))];
+html+=`<div class="section-title" style="margin-top:30px">📁 Progress by Category</div>`;
+cats.forEach(cat=>{
+const catLessons=LESSONS.filter(l=>l.cat===cat);
+const catDone=catLessons.filter(l=>state.completed[l.id]).length;
+const pct=Math.round(catDone/catLessons.length*100);
+html+=`<div style="margin-bottom:16px">
+<div style="display:flex;justify-content:space-between;font-size:0.9em;margin-bottom:4px">
+<span>${cat}</span><span style="color:var(--text-dim)">${catDone}/${catLessons.length}</span>
+</div>
+<div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+</div>`;
+});
+
+// Quiz history
+if(state.quizHistory.length>0){
+html+=`<div class="section-title" style="margin-top:30px">📝 Recent Quiz Scores</div>`;
+const recent=state.quizHistory.slice(-10).reverse();
+recent.forEach(h=>{
+const lesson=LESSONS.find(l=>l.id===h.lessonId);
+const cls=h.score>=80?'good':h.score>=60?'ok':'bad';
+html+=`<div class="history-item">
+<span>${lesson?lesson.icon+' '+lesson.title:'Unknown'}</span>
+<span class="history-score ${cls}">${h.score}%</span>
+</div>`;
+});
+}
+
+// Spaced repetition status
+const reviews=getReviewLessons();
+if(reviews.length>0){
+html+=`<div class="section-title" style="margin-top:30px">🔄 Due for Review</div>`;
+reviews.forEach(l=>{
+const score=state.quizScores[l.id];
+const pct=score?Math.round(score.correct/score.total*100):0;
+html+=`<div class="card" onclick="openLesson('${l.id}')">
+<div class="card-badge badge-review">Review</div>
+<div class="card-title">${l.icon} ${l.title}</div>
+<div class="card-meta"><span>Last score: ${pct}%</span></div>
+</div>`;
+});
+}
+
+html+=`<div style="margin-top:40px;text-align:center">
+<button class="btn btn-secondary btn-sm" onclick="document.getElementById('resetModal').classList.add('active')">🗑️ Reset All Progress</button>
+</div>`;
+
+document.getElementById('dashboardView').innerHTML=html;
+}
+
+function closeModal(){document.getElementById('resetModal').classList.remove('active');}
+function resetProgress(){
+localStorage.removeItem(LS_KEY);
+state=defaultState();
+closeModal();
+showView('today');
+}
+
+// ==================== INIT ====================
+updateStreak();
+const sb=document.getElementById('streakBadge');
+const sc=document.getElementById('streakCount');
+sc.textContent=state.streak;
+if(state.streak>=3)sb.classList.add('active');
+showView('today');
+</script>
+</body>
+</html>
